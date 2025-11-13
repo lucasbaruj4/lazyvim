@@ -5,10 +5,11 @@ return {
     opts = {
       -- Configure keymap for blink.cmp
       keymap = {
+        ["<Enter>"] = { "accept", "fallback" },
         -- Tab to accept auto copmletion
-        ["<Tab>"] = { "accept", "fallback" },
+        ["<Tab>"] = { "select_next", "fallback" },
         -- Use shift tab for next suggestion
-        ["<S-Tab>"] = { "select_next", "fallback" }
+        ["<S-Tab>"] = { "select_prev", "fallback" }
       },
     },
   },
