@@ -1,17 +1,17 @@
 return { {
   "windwp/nvim-ts-autotag",
-  ft = {
-    "javascriptreact",
-    "typescriptreact",
-    "html",
-    "javascript",
-    "typescript",
-  },
+  dependencies = { "nvim-treesitter/nvim-treesitter" },
   config = function()
-    require("nvim-treesitter.configs").setup({
-      autotag = {
-        enable = true,
-      }
+    vim.api.nvim_create_autocmd("User", {
+      pattern = "NvimTreesitterConfigDone",
+      callback = function()
+        require("nvim-tresitter.configs").setup({
+          autotag = {
+            enable = true,
+          }
+        })
+      end
     })
   end,
-} }
+}
+}
