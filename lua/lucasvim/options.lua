@@ -7,6 +7,9 @@ vim.o.relativenumber = true
 -- deleting the chars on the left
 vim.opt.fillchars = { eob = " " }
 
+-- deactivating wrap
+vim.opt.wrap = false
+
 -- yanks go to clipboard
 vim.opt.clipboard = "unnamedplus"
 
