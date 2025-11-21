@@ -1,11 +1,11 @@
+-- leader is space
+vim.g.mapleader = " "
+
 -- setting up the numbers
 vim.o.number = true
 vim.o.relativenumber = true
 -- deleting the chars on the left
 vim.opt.fillchars = { eob = " " }
--- setting up word wraping
-vim.opt.wrap = true
-vim.opt.linebreak = true
 
 -- yanks go to clipboard
 vim.opt.clipboard = "unnamedplus"
@@ -19,4 +19,9 @@ vim.keymap.set("n", "q:", "<Nop>", { silent = true })
 vim.keymap.set("n", "q/", "<Nop>", { silent = true })
 vim.keymap.set("n", "q?", "<Nop>", { silent = true })
 vim.keymap.set("c", "<C-f>", "<Nop>", { silent = true })
+
+-- Show all diagnostics for the current line in a floating window
+vim.keymap.set("n", "<leader>cd", function()
+  vim.diagnostic.open_float(0, { scope = "line" })
+end, { desc = "Line diagnostics" })
 
