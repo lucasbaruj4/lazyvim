@@ -13,6 +13,7 @@ vim.opt.clipboard = "unnamedplus"
 -- deletes (d and D) do NOT go to clipboard
 vim.keymap.set({ "n", "v" }, "d", '"_d')
 vim.keymap.set({ "n", "v" }, "D", '"_D')
+vim.keymap.set({ "n", "v" }, "c", '"_d')
 
 -- disable the command-line window (q:)
 vim.keymap.set("n", "q:", "<Nop>", { silent = true })
