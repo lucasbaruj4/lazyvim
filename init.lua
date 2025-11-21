@@ -1,3 +1,3 @@
 require("lucasvim.options")
 require("lucasvim.plugins")
-require("lucasvim.lsp")
+require("lucasvim.lsp") 
