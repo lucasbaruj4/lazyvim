@@ -1,6 +1,9 @@
 -- leader is space
 vim.g.mapleader = " "
 
+-- making sure diagnostics have rounded borders
+vim.o.winborder = "double"
+
 -- setting up the numbers
 vim.o.number = true
 vim.o.relativenumber = true
