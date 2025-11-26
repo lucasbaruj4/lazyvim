@@ -11,7 +11,10 @@ vim.o.relativenumber = true
 vim.opt.fillchars = { eob = " " }
 
 -- deactivating wrap
-vim.opt.wrap = false
+vim.opt.wrap = true
+vim.opt.linebreak = true
+vim.opt.breakindent = true
+
 
 -- yanks go to clipboard
 vim.opt.clipboard = "unnamedplus"
