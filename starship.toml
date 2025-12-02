@@ -28,5 +28,10 @@ disabled = true
 [python]
 disabled = true
 
+[c]
+disabled = true
+
+[lua]
+disabled = true
 
 
