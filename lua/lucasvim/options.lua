@@ -15,7 +15,28 @@ vim.opt.wrap = true
 vim.opt.linebreak = true
 vim.opt.breakindent = true
 
+-- background to be the same as hacker terminal
+vim.opt.termguicolors = true
+-- Here I activate this command after the colorscheme has been set to override the background color and status line to my current terminal background.
+vim.api.nvim_create_autocmd("ColorScheme", {
+  callback = function()
+    -- main editor background
+    vim.api.nvim_set_hl(0, "Normal",      { bg = "#0a0a0a", fg = "NONE" })
+    vim.api.nvim_set_hl(0, "NormalFloat", { bg = "#0a0a0a", fg = "NONE" })
 
+
+    -- statusline + winbar (the gray strip in your screenshot)
+    vim.api.nvim_set_hl(0, "StatusLine",   { bg = "#0a0a0a", fg = "#ffffff" })
+    vim.api.nvim_set_hl(0, "StatusLineNC", { bg = "#0a0a0a", fg = "#777777" })
+
+    vim.api.nvim_set_hl(0, "WinBar",       { bg = "#0a0a0a", fg = "#ffffff" })
+    vim.api.nvim_set_hl(0, "WinBarNC",     { bg = "#0a0a0a", fg = "#777777" })
+     vim.api.nvim_set_hl(0, "Pmenu",     { bg = "#0a0a0a", fg = "#ffffff" })
+    vim.api.nvim_set_hl(0, "PmenuSel",  { bg = "#0a0a0a", fg = "#00ff66" })
+    vim.api.nvim_set_hl(0, "PmenuSbar", { bg = "#0a0a0a" })
+    vim.api.nvim_set_hl(0, "PmenuThumb",{ bg = "#1f1f1f" })
+    vim.api.nvim_set_hl(0, "Visual", { bg = "#ffffff", fg = "#000000" })
+  end,})
 -- yanks go to clipboard
 vim.opt.clipboard = "unnamedplus"
 

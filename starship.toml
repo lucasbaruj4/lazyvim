@@ -1,0 +1,32 @@
+# Simplified Starship (no emojis)
+
+[character]
+success_symbol = "[>](bold #00ff66)"
+error_symbol = "[>](bold #ff3b3b)"
+
+
+[status]
+disabled = true
+
+[rust]
+disabled = true
+
+[directory]
+fish_style_pwd_dir_length = 0
+format = "[$path](bold #00ff66) "
+
+
+[cmd_duration]
+disabled = true
+
+[package]
+disabled = true
+
+[nodejs]
+disabled = true
+
+[python]
+disabled = true
+
+
+
