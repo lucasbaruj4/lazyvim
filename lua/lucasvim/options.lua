@@ -21,13 +21,13 @@ vim.opt.termguicolors = true
 vim.api.nvim_create_autocmd("ColorScheme", {
   callback = function()
     -- main editor background
-    vim.api.nvim_set_hl(0, "Normal",      { bg = "#0a0a0a", fg = "NONE" })
+    vim.api.nvim_set_hl(0, "Normal",      { bg = "NONE", fg = "NONE" })
     vim.api.nvim_set_hl(0, "NormalFloat", { bg = "#0a0a0a", fg = "NONE" })
 
 
     -- statusline + winbar (the gray strip in your screenshot)
-    vim.api.nvim_set_hl(0, "StatusLine",   { bg = "#0a0a0a", fg = "#ffffff" })
-    vim.api.nvim_set_hl(0, "StatusLineNC", { bg = "#0a0a0a", fg = "#777777" })
+    vim.api.nvim_set_hl(0, "StatusLine",   { bg = "NONE", fg = "#ffffff" })
+    vim.api.nvim_set_hl(0, "StatusLineNC", { bg = "NONE", fg = "#777777" })
 
     vim.api.nvim_set_hl(0, "WinBar",       { bg = "#0a0a0a", fg = "#ffffff" })
     vim.api.nvim_set_hl(0, "WinBarNC",     { bg = "#0a0a0a", fg = "#777777" })
