@@ -46,6 +46,9 @@ vim.keymap.set("n", "<leader>w", ":w<Enter>")
 -- save if they were change and quit with leader q instead of ":x"
 vim.keymap.set("n", "<leader>q", ":x<Enter>")
 
+-- go to the last part of the current line with leader l instead of "$"
+vim.keymap.set("n", "<leader>l", "$")
+
 -- deletes (d and D) do NOT go to clipboard
 vim.keymap.set({ "n", "v" }, "d", '"_d')
 vim.keymap.set({ "n", "v" }, "D", '"_D')
