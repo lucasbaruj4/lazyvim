@@ -40,6 +40,12 @@ vim.api.nvim_create_autocmd("ColorScheme", {
 -- yanks go to clipboard
 vim.opt.clipboard = "unnamedplus"
 
+-- save with leader w instead of ":w"
+vim.keymap.set("n", "<leader>w", ":w<Enter>")
+
+-- save if they were change and quit with leader q instead of ":x"
+vim.keymap.set("n", "<leader>q", ":x<Enter>")
+
 -- deletes (d and D) do NOT go to clipboard
 vim.keymap.set({ "n", "v" }, "d", '"_d')
 vim.keymap.set({ "n", "v" }, "D", '"_D')
