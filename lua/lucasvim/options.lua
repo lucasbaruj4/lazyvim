@@ -10,6 +10,7 @@ vim.o.relativenumber = true
 -- deleting the chars on the left
 vim.opt.fillchars = { eob = " " }
 
+
 -- deactivating wrap
 vim.opt.wrap = true
 vim.opt.linebreak = true
@@ -36,6 +37,7 @@ vim.api.nvim_create_autocmd("ColorScheme", {
     vim.api.nvim_set_hl(0, "PmenuSbar", { bg = "#0a0a0a" })
     vim.api.nvim_set_hl(0, "PmenuThumb",{ bg = "#1f1f1f" })
     vim.api.nvim_set_hl(0, "Visual", { bg = "#ffffff", fg = "#000000" })
+    vim.api.nvim_set_hl(0, "SignColumn", {bg = "NONE", fg = "NONE"})
   end,})
 -- yanks go to clipboard
 vim.opt.clipboard = "unnamedplus"
