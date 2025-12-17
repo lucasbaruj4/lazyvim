@@ -2,7 +2,7 @@
 require("mason").setup()
 require("mason-lspconfig").setup {
 
-  ensure_installed = { "pyright", "ts_ls", "lua_ls" },
+  ensure_installed = { "pyright", "ts_ls", "lua_ls", "rust_analyzer" },
 }
 
 -- Capabilities (with blink.cmp)
@@ -11,6 +11,11 @@ capabilities = require("blink.cmp").get_lsp_capabilities(capabilities)
 
 -- PYRIGHT
 vim.lsp.config("pyright", {
+  capabilities = capabilities,
+})
+
+-- RUST
+vim.lsp.config("rust_analyzer", {
   capabilities = capabilities,
 })
 
