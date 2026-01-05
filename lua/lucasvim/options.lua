@@ -62,6 +62,12 @@ vim.keymap.set("n", "q/", "<Nop>", { silent = true })
 vim.keymap.set("n", "q?", "<Nop>", { silent = true })
 vim.keymap.set("c", "<C-f>", "<Nop>", { silent = true })
 
+-- open netrw file explorer with leader e instead of ":Explore"
+vim.g.netrw_winsize = 30
+vim.g.netrw_keepdir = 0
+vim.g.netrw_banner = 0
+vim.keymap.set("n", "<leader>e", ":Explore<Enter>")
+
 -- Show all diagnostics for the current line in a floating window
 vim.keymap.set("n", "<leader>cd", function()
   vim.diagnostic.open_float(0, { scope = "line" })
