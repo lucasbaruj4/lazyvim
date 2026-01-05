@@ -68,6 +68,10 @@ vim.g.netrw_keepdir = 0
 vim.g.netrw_banner = 0
 vim.keymap.set("n", "<leader>e", ":Explore<Enter>")
 
+-- terminal keyboard shortcuts configuration
+vim.keymap.set("n", "<leader>t", ":terminal<Enter>")
+vim.keymap.set("t", "<Esc>", '<C-\\><C-N>', { silent = true, noremap = true })
+
 -- Show all diagnostics for the current line in a floating window
 vim.keymap.set("n", "<leader>cd", function()
   vim.diagnostic.open_float(0, { scope = "line" })
