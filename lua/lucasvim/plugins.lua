@@ -60,6 +60,18 @@ require("lazy").setup({
 	  dependencies = { { "nvim-mini/mini.icons", opts = {} } },
 	  lazy = false,
   },
+  {
+	  "akinsho/toggleterm.nvim",
+	  version = "*",
+	  opts = {
+		  direction = 'float',
+		  close_on_exit = 'true',
+		  auto_scroll = true,
+		  open_mapping = [[<leader>ft]],
+		  autochdir = true,
+		  start_in_insert = true,
+	  },
+  },
 })
 
 require("nvim-treesitter.configs").setup({

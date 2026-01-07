@@ -47,6 +47,7 @@ vim.keymap.set("n", "<leader>w", ":w<Enter>")
 
 -- save if they were change and quit with leader q instead of ":x"
 vim.keymap.set("n", "<leader>q", ":x<Enter>")
+vim.keymap.set("t", "<leader>q", "<C-D>:x<Enter>")
 
 -- go to the last part of the current line with leader l instead of "$"
 vim.keymap.set("n", "<leader>l", "$")
@@ -70,10 +71,6 @@ vim.g.netrw_banner = 0
 
 -- keymaps for oil.nvim
 vim.keymap.set("n", "<leader>e", ":Oil --float <Enter>")
-
--- terminal keyboard shortcuts configuration
-vim.keymap.set("n", "<leader>t", ":terminal<Enter>")
-vim.keymap.set("t", "<Esc>", '<C-\\><C-N>', { silent = true, noremap = true })
 
 -- Show all diagnostics for the current line in a floating window
 vim.keymap.set("n", "<leader>cd", function()
