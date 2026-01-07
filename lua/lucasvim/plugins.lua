@@ -45,9 +45,20 @@ require("lazy").setup({
   {
 	  "nvim-treesitter/nvim-treesitter",
 	  build = ":TSUpdate",
-  }, 
+  },
   {
 	  "neovim/nvim-lspconfig",
+  },
+  {
+	  "stevearc/oil.nvim",
+	  ---@module 'oil'
+	  opts = {
+	  view_options = { show_hidden = true },
+	  },
+	  skip_confirm_for_simple_edits = true,
+	  prompt_save_on_select_new_entry = false,
+	  dependencies = { { "nvim-mini/mini.icons", opts = {} } },
+	  lazy = false,
   },
 })
 

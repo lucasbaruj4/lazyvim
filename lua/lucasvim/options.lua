@@ -62,11 +62,14 @@ vim.keymap.set("n", "q/", "<Nop>", { silent = true })
 vim.keymap.set("n", "q?", "<Nop>", { silent = true })
 vim.keymap.set("c", "<C-f>", "<Nop>", { silent = true })
 
--- open netrw file explorer with leader e instead of ":Explore"
+-- (DEPRECATED, WE NOW USE OIL.NVIM) open netrw file explorer with leader e instead of ":Explore"
 vim.g.netrw_winsize = 30
 vim.g.netrw_keepdir = 0
 vim.g.netrw_banner = 0
-vim.keymap.set("n", "<leader>e", ":Explore<Enter>")
+-- vim.keymap.set("n", "<leader>e", ":Explore<Enter>")
+
+-- keymaps for oil.nvim
+vim.keymap.set("n", "<leader>e", ":Oil --float <Enter>")
 
 -- terminal keyboard shortcuts configuration
 vim.keymap.set("n", "<leader>t", ":terminal<Enter>")
