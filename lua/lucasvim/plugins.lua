@@ -71,6 +71,7 @@ require("lazy").setup({
 		  insert_mappings = false,
 		  autochdir = true,
 		  start_in_insert = true,
+		  shell = "powershell.exe",
 	  },
   },
   {
