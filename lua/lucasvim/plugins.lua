@@ -49,17 +49,17 @@ require("lazy").setup({
   {
 	  "neovim/nvim-lspconfig",
   },
-  {
-	  "stevearc/oil.nvim",
-	  ---@module 'oil'
-	  opts = {
-	  view_options = { show_hidden = true },
-	  },
-	  skip_confirm_for_simple_edits = true,
-	  prompt_save_on_select_new_entry = false,
-	  dependencies = { { "nvim-mini/mini.icons", opts = {} } },
-	  lazy = false,
-  },
+  -- {
+  --  "stevearc/oil.nvim",
+  --  ---@module 'oil'
+  --  opts = {
+  --  view_options = { show_hidden = true },
+  --  },
+  --  skip_confirm_for_simple_edits = true,
+  --  prompt_save_on_select_new_entry = false,
+  --  dependencies = { { "nvim-mini/mini.icons", opts = {} } },
+  --  lazy = false,
+  -- },
   {
 	  "akinsho/toggleterm.nvim",
 	  version = "*",
@@ -68,8 +68,30 @@ require("lazy").setup({
 		  close_on_exit = 'true',
 		  auto_scroll = true,
 		  open_mapping = [[<leader>ft]],
+		  insert_mappings = false,
 		  autochdir = true,
 		  start_in_insert = true,
+	  },
+  },
+  {
+	  "mikavilpas/yazi.nvim",
+	  version = "*",
+	  dependencies = {
+		  {"nvim-lua/plenary.nvim", lazy = true },
+	  },
+	  opts = {
+		  floating_window_scaling_factor = 0.9,
+		  yazi_floating_window_border = 'rounded',
+		  open_for_directories = true,
+	  },
+	  hooks = {
+		  yazi_closed_successfully = function(chosen_file, config, state)
+			  if chosen_file then
+			  	-- Change cwd of nvim to the file currently open 
+				local dir = vim.fn.fnamemodify(chosen_file, ":h")
+				vim.cmd("cd" .. dir)
+			  end
+		  end,
 	  },
   },
 })

@@ -1,5 +1,12 @@
 -- leader is space
 vim.g.mapleader = " "
+vim.opt.timeout = true
+vim.opt.timeoutlen = 200
+vim.opt.ttimeoutlen = 10
+
+-- making sure nvim is always on the cwd of the file we opened 
+vim.opt.autochdir = true
+
 
 -- making sure diagnostics have rounded borders
 vim.o.winborder = "double"
@@ -10,7 +17,11 @@ vim.o.relativenumber = true
 -- deleting the chars on the left
 vim.opt.fillchars = { eob = " " }
 
-
+-- neovide config  
+if vim.g.neovide then
+	vim.g.neovide_fullscreen = true
+	vim.g.neovide_remember_windows_size = false
+end
 -- deactivating wrap
 vim.opt.wrap = true
 vim.opt.linebreak = true
@@ -47,7 +58,13 @@ vim.keymap.set("n", "<leader>w", ":w<Enter>")
 
 -- save if they were change and quit with leader q instead of ":x"
 vim.keymap.set("n", "<leader>q", ":x<Enter>")
-vim.keymap.set("t", "<leader>q", "<C-D>:x<Enter>")
+vim.keymap.set("t", "<leader>q", "<C-\\><C-n>:x<CR>")
+
+-- Easier window navigation
+vim.keymap.set("n", "<C-h>", "<C-w>h")
+vim.keymap.set("n", "<C-l>", "<C-w>l")
+vim.keymap.set("n", "<C-j>", "<C-w>j")
+vim.keymap.set("n", "<C-k>", "<C-w>k")
 
 -- go to the last part of the current line with leader l instead of "$"
 vim.keymap.set("n", "<leader>l", "$")
@@ -67,10 +84,12 @@ vim.keymap.set("c", "<C-f>", "<Nop>", { silent = true })
 vim.g.netrw_winsize = 30
 vim.g.netrw_keepdir = 0
 vim.g.netrw_banner = 0
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
 -- vim.keymap.set("n", "<leader>e", ":Explore<Enter>")
 
--- keymaps for oil.nvim
-vim.keymap.set("n", "<leader>e", ":Oil --float <Enter>")
+-- keymaps for yazi
+vim.keymap.set("n", "<leader>e", "<cmd>Yazi<cr>")
 
 -- Show all diagnostics for the current line in a floating window
 vim.keymap.set("n", "<leader>cd", function()
