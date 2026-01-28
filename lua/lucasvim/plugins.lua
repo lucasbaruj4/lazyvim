@@ -81,18 +81,10 @@ require("lazy").setup({
 		  {"nvim-lua/plenary.nvim", lazy = true },
 	  },
 	  opts = {
-		  floating_window_scaling_factor = 0.9,
+		  floating_window_scaling_factor = 0.8,
 		  yazi_floating_window_border = 'rounded',
 		  open_for_directories = true,
-	  },
-	  hooks = {
-		  yazi_closed_successfully = function(chosen_file, config, state)
-			  if chosen_file then
-			  	-- Change cwd of nvim to the file currently open 
-				local dir = vim.fn.fnamemodify(chosen_file, ":h")
-				vim.cmd("cd" .. dir)
-			  end
-		  end,
+		  yazi_floating_window_winblend = 0,
 	  },
   },
 })
