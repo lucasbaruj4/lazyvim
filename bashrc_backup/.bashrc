@@ -208,3 +208,29 @@ disown
 export PATH="$HOME/.grok/bin:$PATH"
 [[ -r "$HOME/.grok/completions/bash/grok.bash" ]] && source "$HOME/.grok/completions/bash/grok.bash"
 # <<< grok installer <<<
+
+# --- tmux tab auto-rename: window name tracks the last component of cwd ---
+# Skipped for any window Claude has pinned (see the `claude` wrapper below
+# and ~/.claude/CLAUDE.md), so an in-progress claude session's 2-word
+# identifier isn't immediately overwritten by this on the next prompt.
+_tmux_rename_to_cwd() {
+  [ -n "$TMUX" ] || return
+  [ "$(tmux show-window-options -v -t "$TMUX_PANE" @pinned 2>/dev/null)" = "1" ] && return
+  local name="${PWD##*/}"
+  [ "$PWD" = "$HOME" ] && name="~"
+  tmux rename-window -- "$name"
+}
+PROMPT_COMMAND="_tmux_rename_to_cwd${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+
+# Wrap `claude` so that once the session ends, the tab un-pins and reverts
+# to tracking the directory name again instead of keeping Claude's last
+# 2-word identifier forever.
+claude() {
+  command claude "$@"
+  local status=$?
+  if [ -n "$TMUX" ]; then
+    tmux set-window-option -t "$TMUX_PANE" @pinned 0 >/dev/null 2>&1
+    _tmux_rename_to_cwd
+  fi
+  return $status
+}
