@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# tmux-volume: report volume with scalable bands + explicit mute "x"
+# Queries REAL Windows master volume (via CoreAudio COM) so the bar
+# always matches what the physical machine / Windows volume slider / keys show.
+# (pactl reflects the RDP audio sink only and does not match host master volume.)
+# More filled bands (█) = louder; fewer = quieter. "x" when muted.
+# Uses 3-segment bar as before. Direct PS query on every status refresh.
+
+EXE='/mnt/c/Users/Admin/AppData/Local/AudioCtl.exe'
+
+# Get live values from Windows (precompiled exe -- avoids ~600ms of
+# powershell.exe + Add-Type C# recompilation on every status refresh)
+raw=$("$EXE" status 2>/dev/null | tr -d '\r')
+
+pct=$(echo "$raw" | grep -oP 'volume=\K[0-9.]+')
+mute=$(echo "$raw" | grep -oP 'muted=\K\w+' | tr '[:upper:]' '[:lower:]')
+[ "$mute" = "true" ] && mute="yes" || mute="no"
+
+# Fallbacks
+pct=${pct:-80}
+pct=$(printf '%.0f' "$pct" 2>/dev/null || echo 80)
+[ "$pct" -gt 100 ] && pct=100
+[ "$pct" -lt 0 ] && pct=0
+[ -z "$mute" ] && mute="no"
+
+if [ "$mute" = "yes" ]; then
+  if [ -t 1 ]; then
+    printf "󰖁  x\n"
+  else
+    printf "󰖁  x"
+  fi
+  TMPF="$HOME/.cache/tmux-hw/volume.tmp.$$"; printf "󰖁  x" > "$TMPF" 2>/dev/null && mv -f "$TMPF" "$HOME/.cache/tmux-hw/volume" || true
+  exit 0
+fi
+
+# Base icon (tiered)
+if [ "$pct" -eq 0 ]; then
+  icon="󰝟"
+elif [ "$pct" -lt 30 ]; then
+  icon=""
+else
+  icon=""
+fi
+
+# 3-segment bar (more █ = louder). Thresholds are 34/67/100 (not a plain
+# i*34 = 34/68/102) so the last segment can actually reach "full" -- pct
+# tops out at 100, so a threshold of 102 could never be met.
+bar=""
+i=1
+while [ $i -le 3 ]; do
+  thresh=$(( (i * 100 + 2) / 3 ))
+  if [ "$pct" -ge $thresh ]; then
+    bar="${bar}█"
+  else
+    bar="${bar}░"
+  fi
+  i=$((i + 1))
+done
+
+# Output with CLEAR space (two spaces) between icon and bars.
+# Newline only for direct interactive runs (tmux #( ) does not want trailing \n).
+if [ -t 1 ]; then
+  printf "%s  %s %s%%\n" "$icon" "$bar" "$pct"
+else
+  printf "%s  %s %s%%" "$icon" "$bar" "$pct"
+fi
+
+# Update compat cache (used by poller etc.) -- atomic with unique tmp
+TMPF="$HOME/.cache/tmux-hw/volume.tmp.$$"; printf "%s  %s %s%%" "$icon" "$bar" "$pct" > "$TMPF" 2>/dev/null && mv -f "$TMPF" "$HOME/.cache/tmux-hw/volume" || true

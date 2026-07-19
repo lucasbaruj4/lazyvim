@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+EXE='/mnt/c/Users/Admin/AppData/Local/AudioCtl.exe'
+
+case "${1:-status}" in
+  up|down|mute|unmute|toggle|status)
+    "$EXE" "$1" 2>&1 | tr -d '\r'
+    ;;
+  set)
+    "$EXE" set "${2:-50}" 2>&1 | tr -d '\r'
+    ;;
+  *) echo "usage: volume [up|down|mute|unmute|toggle|set <0-100>|status]" ;;
+esac

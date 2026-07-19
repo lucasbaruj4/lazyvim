@@ -1,0 +1,60 @@
+#!/bin/bash
+# take-screenshot (bound to F2 + s or similar)
+# Takes a full desktop screenshot using Windows .NET APIs,
+# saves it with timestamp, copies to WSL, and puts the WSL path
+# on the Windows clipboard so you can immediately Ctrl+Shift+V.
+#
+# No manual Win+Shift+S needed. One key press does everything.
+
+set -euo pipefail
+
+PS='/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'
+
+# Target dir for convenience
+TARGET_DIR="${1:-$HOME/Pictures/screenshots}"
+mkdir -p "$TARGET_DIR"
+
+echo "📸 Capturing screenshot..."
+
+# PowerShell does the actual capture (full primary screen)
+raw_result=$("$PS" -NoProfile -Command '
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+$bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+$bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+$graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+$ts = Get-Date -Format "yyyyMMdd-HHmmss"
+$winpath = "$env:USERPROFILE\Pictures\Screenshots\wsl-screenshot-$ts.png"
+$bitmap.Save($winpath, [System.Drawing.Imaging.ImageFormat]::Png)
+$bitmap.Dispose()
+$graphics.Dispose()
+Write-Output "IMAGE_SAVED:$winpath"
+' 2>/dev/null || echo "CAPTURE_FAILED")
+
+result=$(echo "$raw_result" | tr -d '\r')
+
+if echo "$result" | grep -q "IMAGE_SAVED:"; then
+  winpath=$(echo "$result" | sed 's/IMAGE_SAVED://')
+
+  # Convert Windows path -> WSL path
+  wslpath=$(echo "$winpath" | sed 's|C:\\|/mnt/c/|I; s|\\|/|g')
+
+  filename=$(basename "$wslpath")
+  target="$TARGET_DIR/$filename"
+
+  if cp "$wslpath" "$target"; then
+    # Put the usable path on the Windows clipboard (plain text)
+    echo -n "$target" | /mnt/c/Windows/System32/clip.exe 2>/dev/null || true
+
+    echo "✅ Screenshot saved: $target"
+    echo "   Path is now on your clipboard."
+    echo "   Press Ctrl+Shift+V to paste the path."
+  else
+    echo "❌ Capture succeeded but copy to WSL failed."
+    echo "   Windows file: $winpath"
+  fi
+else
+  echo "❌ Screenshot capture failed."
+  echo "   Make sure you are not in a fullscreen exclusive app."
+fi

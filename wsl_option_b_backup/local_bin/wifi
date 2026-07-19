@@ -1,0 +1,137 @@
+
+#!/usr/bin/env bash
+
+NETSH='/mnt/c/Windows/System32/netsh.exe'
+
+PS='/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'
+
+PSWIN='C:\Users\Admin\.wifi-scan.ps1'
+
+
+
+scan() {
+
+  local tmp err; tmp=$(mktemp); err=$(mktemp)
+
+  ( "$PS" -NoProfile -ExecutionPolicy Bypass -File "$PSWIN" 2>"$err" | tr -d '\r' | awk 'NF' > "$tmp" ) &
+
+  local pid=$! sp='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏' i=0
+
+  while kill -0 "$pid" 2>/dev/null; do
+
+    printf '\r\033[K%s scanning for networks…' "${sp:i++%${#sp}:1}" >&2
+
+    sleep 0.1
+
+  done
+
+  wait "$pid" 2>/dev/null
+
+  printf '\r\033[K' >&2
+
+  if [[ -s "$err" ]]; then
+
+    echo "PS error: $(cat "$err" | tr -d '\r')" >&2
+
+  fi
+
+  if [[ -s "$tmp" ]]; then
+
+    sort -u "$tmp"
+
+  else
+
+    echo "WinRT live scan failed — using cached list" >&2
+
+    "$NETSH" wlan show networks 2>/dev/null | tr -d '\r' | sed -n 's/^SSID [0-9]* : //p' | awk 'NF' | sort -u
+
+  fi
+
+  rm -f "$tmp" "$err"
+
+}
+
+known_ssids() {
+
+  "$NETSH" wlan show profiles | tr -d '\r' | sed -n 's/^ *All User Profile *: *//p' | sort -u
+
+}
+
+list_sectioned() {
+
+  local all known
+  all=$(scan | sort -u)
+  known=$(known_ssids)
+
+  echo "── known ──"
+  comm -12 <(printf '%s\n' "$known") <(printf '%s\n' "$all")
+  echo "── new ──"
+  comm -23 <(printf '%s\n' "$all") <(printf '%s\n' "$known")
+
+}
+
+
+
+case "${1:-pick}" in
+
+  status)     "$NETSH" wlan show interfaces | tr -d '\r' ;;
+
+  list)       list_sectioned ;;
+
+  disconnect) "$NETSH" wlan disconnect ;;
+
+  on)  "$NETSH" interface set interface name="WLAN" admin=enabled ;;
+
+  off) "$NETSH" interface set interface name="WLAN" admin=disabled ;;
+
+  pick)
+
+    ssid=$(list_sectioned | fzf --prompt="wifi > " --height=40% --reverse)
+
+    [ -z "$ssid" ] && exit 0
+    [[ "$ssid" == "── known ──" || "$ssid" == "── new ──" ]] && exit 0
+
+    if "$NETSH" wlan show profiles | tr -d '\r' | grep -qF "$ssid"; then
+
+      "$NETSH" wlan connect name="$ssid"
+
+    else
+
+      read -rp "password for $ssid: " pass
+
+      xml_escape() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e "s/'/\&apos;/g" -e 's/"/\&quot;/g' <<<"$1"; }
+      essid=$(xml_escape "$ssid")
+      epass=$(xml_escape "$pass")
+
+      xml="/mnt/c/Users/Admin/AppData/Local/Temp/wifi-$$.xml"
+
+      cat > "$xml" <<XML
+<?xml version="1.0"?>
+<WLANProfile xmlns="http://www.microsoft.com/networking/WLAN/profile/v1">
+ <name>$essid</name>
+ <SSIDConfig><SSID><name>$essid</name></SSID></SSIDConfig>
+ <connectionType>ESS</connectionType><connectionMode>auto</connectionMode>
+ <MSM><security>
+  <authEncryption><authentication>WPA2PSK</authentication><encryption>AES</encryption><useOneX>false</useOneX></authEncryption>
+  <sharedKey><keyType>passPhrase</keyType><protected>false</protected><keyMaterial>$epass</keyMaterial></sharedKey>
+ </security></MSM>
+</WLANProfile>
+XML
+
+      add_out=$("$NETSH" wlan add profile filename="$(wslpath -w "$xml")" 2>&1 | tr -d '\r')
+
+      rm -f "$xml"
+
+      if ! grep -qi "is added on interface" <<<"$add_out"; then
+        echo "failed to add profile: $add_out" >&2
+        exit 1
+      fi
+
+      "$NETSH" wlan connect name="$ssid"
+
+    fi ;;
+
+  *) echo "usage: wifi [pick|list|status|disconnect|on|off]" ;;
+
+esac
+

@@ -1,0 +1,86 @@
+#!/bin/bash
+# paste-screenshot: Retrieve the current image from the Windows clipboard
+# (e.g. after Win+Shift+S, Snipping Tool, or PrtSc) and save it as a PNG
+# inside WSL so you can actually use it from the terminal.
+#
+# Usage:
+#   paste-screenshot                 # saves to ~/Pictures/screenshots/
+#   paste-screenshot .               # saves to current directory
+#   paste-screenshot /tmp/foo        # saves to /tmp/foo/
+#
+# The file will be named with a timestamp. The full WSL path is printed
+# and also copied to the Windows clipboard for convenience.
+
+set -euo pipefail
+
+PS='/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'
+
+# Handle help
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ] || [[ "${1:-}" == -* ]]; then
+  echo "paste-screenshot - save Windows clipboard screenshot into WSL"
+  echo ""
+  echo "Usage:"
+  echo "  paste-screenshot                 # ~/Pictures/screenshots/"
+  echo "  paste-screenshot .               # current directory"
+  echo "  paste-screenshot ~/my-shots      # custom directory"
+  exit 0
+fi
+
+# Default target
+if [ -z "${1:-}" ]; then
+  TARGET_DIR="$HOME/Pictures/screenshots"
+else
+  TARGET_DIR="$1"
+fi
+mkdir -p "$TARGET_DIR"
+
+# Run PowerShell to save clipboard image (if any) to a Windows temp file.
+# We capture the output and clean Windows \r characters.
+raw_result=$("$PS" -NoProfile -Command '
+Add-Type -AssemblyName System.Windows.Forms
+$img = [System.Windows.Forms.Clipboard]::GetImage()
+if ($img -ne $null) {
+  $ts = Get-Date -Format "yyyyMMdd-HHmmss"
+  $tempDir = [System.Environment]::GetFolderPath("LocalApplicationData") + "\Temp"
+  $winpath = "$tempDir\wsl-screenshot-$ts.png"
+  $img.Save($winpath, "Png")
+  Write-Output "IMAGE_SAVED:$winpath"
+} else {
+  Write-Output "NO_IMAGE"
+}
+' 2>/dev/null || echo "NO_IMAGE")
+
+result=$(echo "$raw_result" | tr -d '\r')
+
+if echo "$result" | grep -q "IMAGE_SAVED:"; then
+  winpath=$(echo "$result" | sed 's/IMAGE_SAVED://')
+
+  # Convert to WSL mount path
+  wslpath=$(echo "$winpath" | sed 's|C:\\|/mnt/c/|I; s|\\|/|g')
+
+  filename=$(basename "$wslpath")
+  target="$TARGET_DIR/$filename"
+
+  if cp "$wslpath" "$target" 2>/dev/null; then
+    echo "✅ Screenshot saved to: $target"
+    # Put the usable path into the Windows clipboard too
+    echo -n "$target" | /mnt/c/Windows/System32/clip.exe 2>/dev/null || true
+    echo "   (local path also copied to clipboard)"
+    echo ""
+    echo "   Examples:"
+    echo "     file \"$target\""
+    echo "     xdg-open \"$target\"     # if you have a GUI viewer"
+    echo "     cp \"$target\" ~/myimage.png"
+  else
+    echo "❌ Could not copy from Windows temp."
+    echo "   The image was saved on Windows at: $winpath"
+    echo "   You can access it manually at: $wslpath"
+  fi
+else
+  echo "❌ No image found in the Windows clipboard."
+  echo ""
+  echo "   Steps to use:"
+  echo "   1. Take a screenshot on Windows (Win + Shift + S, or PrtSc, or Snipping Tool)"
+  echo "   2. Run: paste-screenshot"
+  echo "   3. (or paste-screenshot .   to save in the current directory)"
+fi

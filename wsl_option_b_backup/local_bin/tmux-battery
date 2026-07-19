@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# tmux-battery: report battery % with charging energy indicator
+# Uses Windows interop (consistent with other hw scripts) for reliability in WSL
+
+EXE='/mnt/c/Users/Admin/AppData/Local/BatteryCtl.exe'
+
+# Single query for percent + BatteryStatus (precompiled exe -- avoids
+# powershell.exe startup cost on every status refresh)
+data=$("$EXE" 2>/dev/null | tr -d '\r')
+
+pct=$(echo "$data" | awk '{print $1}')
+st=$(echo "$data" | awk '{print $2}')
+
+pct=${pct:-0}
+st=${st:-0}
+
+# BatteryStatus values indicating on AC / charging: 2,6,7,8,9 (and sometimes others)
+if [ "$st" = "2" ] || [ "$st" = "6" ] || [ "$st" = "7" ] || [ "$st" = "8" ] || [ "$st" = "9" ]; then
+  # Energy/charging sign as requested
+  printf " %s%%" "$pct"
+else
+  if [ "$pct" -ge 80 ]; then i=""; elif [ "$pct" -ge 60 ]; then i=""; elif [ "$pct" -ge 40 ]; then i=""; elif [ "$pct" -ge 20 ]; then i=""; else i=""; fi
+  printf "%s %s%%" "$i" "$pct"
+fi
+

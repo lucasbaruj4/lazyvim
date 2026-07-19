@@ -1,0 +1,93 @@
+# === Omarchy Alacritty Config (Windows) ===
+
+# Import Omarchy theme colors (we'll inline it below since no symlink on Windows)
+# Original: general.import = [ "~/.config/omarchy/current/theme/alacritty.toml" ]
+# → We'll hardcode a clean dark theme (Dracula-like, Omarchy default)
+
+[env]
+TERM = "xterm-256color"
+
+[font]
+normal = { family = "CaskaydiaMono NF", style = "Regular" }
+bold = { family = "CaskaydiaMono NF", style = "Bold" }
+italic = { family = "CaskaydiaMono NF", style = "Italic" }
+bold_italic = { family = "CaskaydiaMono NF", style = "Bold Italic" }
+size = 18.0  # Slightly larger on Windows for readability
+
+[window]
+padding = { x = 14, y = 1 }
+decorations = "Full"  # Changed: "None" hides titlebar on Windows (not recommended)
+opacity = 0.65
+dynamic_padding = false
+startup_mode = "Fullscreen"
+
+# === Colors: Hacker Green + Dark Steel ===
+[colors.primary]
+background = "#0a0a0a"
+foreground = "#ffffff"
+
+[colors.normal]
+black   = "#111111"
+red     = "#ff3b3b"
+green   = "#00ff66"
+yellow  = "#dfff00"
+blue    = "#26a8ff"
+magenta = "#ff4dff"
+cyan    = "#00ffd5"
+white   = "#cccccc"
+
+[colors.bright]
+black   = "#2a2a2a"
+red     = "#ff5454"
+green   = "#00ff7f"
+yellow  = "#f2ff5e"
+blue    = "#4db8ff"
+magenta = "#ff66ff"
+cyan    = "#33ffe6"
+white   = "#f0f0f0"
+
+[colors.cursor]
+text = "#0a0a0a"
+cursor = "#00ff66"
+
+[colors.selection]
+text = "#0a0a0a"
+background = "#00ff66"
+
+# === Keybindings ===
+[[keyboard.bindings]]
+key = "F11"
+action = "ToggleFullscreen"
+
+[[keyboard.bindings]]
+key = "V"
+mods = "Control|Shift"
+action = "Paste"
+
+[[keyboard.bindings]]
+key = "C"
+mods = "Control|Shift"
+action = "Copy"
+
+# Screenshot (Shift+S), volume (Ctrl+Alt+Up/Down), and mute
+# (Ctrl+Shift+M) are NOT bound here anymore -- they're all true
+# system-wide hotkeys registered by the always-running GlobalHotkeys.exe
+# (see alacritty-shell.vbs), so they work no matter which app has focus
+# (browser, Alacritty, anything), not just here. A Windows global hotkey
+# pre-empts normal key delivery entirely, so local Alacritty bindings for
+# the same combos would never fire anyway -- and would conflict if they
+# somehow did. Same trade-off as before: typing a capital "S" via Shift is
+# unavailable everywhere now (explicitly chosen by the user over safer
+# combos like Ctrl+Shift+S).
+
+# [terminal.shell]
+# program = "powershell"
+# args = ["-NoExit", "-Command", "cd C:\\Users\\Admin"]
+
+[terminal.shell]
+program = "wsl.exe"
+args = ["-d", "Ubuntu", "--cd", "~"]
+
+[scrolling]
+history = 100000
+multiplier = 3
