@@ -234,3 +234,6 @@ claude() {
   fi
   return $status
 }
+
+# GitHub PAT for MCP (file is 600, never committed)
+[ -f "$HOME/.config/secrets/github-pat.env" ] && . "$HOME/.config/secrets/github-pat.env"

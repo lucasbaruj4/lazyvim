@@ -1,0 +1,105 @@
+# NOTE: BOOKMARKS values with personal IDs are replaced by <PLACEHOLDERS>
+# in this backup copy. The live ~/.bash_aliases has the real URLs.
+
+alias ros='docker run -it --rm -e DISPLAY=:0.0 -v /tmp/.X11-unix:/tmp/.X11-unix ros2-humble-dev-full bash'
+
+# --- bri: interactive brightness TUI ---
+alias bri='~/.local/bin/brightness-tui'
+
+# --- camera: open webcam viewer from WSL ---
+# The real Windows Camera app is a UWP/MSIX package. Its activation now
+# takes ~45s (fixed COM timeout) because there's no shell broker running
+# (no explorer.exe). Route around it entirely: a local webcam page opened
+# in Brave (plain Win32 app, launches instantly here).
+camera() {
+  _brave --app="file:///C:/Users/Admin/AppData/Local/camera.html"
+}
+
+# --- browse: open bookmarks or any URL in Windows Brave ---
+declare -A BOOKMARKS=(
+  [ecampus]="https://ecampus.srh-berlin.de/my/"
+  [campusnet]="https://campus.srh-hochschule-berlin.de/scripts/mgrqispi.dll?APPNAME=CampusNet&PRGNAME=MLSSTART&ARGUMENTS=-N<ACCOUNT_ARG>,-N000308,"
+  [gmail]="https://mail.google.com/mail/u/1/#inbox"
+  [cal]="https://calendar.google.com/calendar/u/1/r"
+  [gh]="https://github.com/lucasbaruj4"
+  [linkedin]="https://www.linkedin.com/in/<PROFILE>/"
+  [claude]="https://claude.ai/new"
+  [gpt]="https://chatgpt.com/"
+  [books]="https://play.google.com/books/s/<SHELF_ID>"
+  [grok]="https://grok.com/"
+  [plx]="https://www.perplexity.ai/"
+  [yt]="https://www.youtube.com/"
+  [docs]="https://docs.google.com/document/u/1/"
+  [classroom]="https://classroom.google.com/u/1/?pli=1"
+  [folio]="https://bashfoliovercel.vercel.app/"
+  [teams]="https://teams.microsoft.com/v2/"
+  [outlook]="https://outlook.office.com/mail/?realm=<REALM>&login_hint=<EMAIL>"
+  [x]="https://x.com/home"
+  [ig]="https://www.instagram.com/?hl=en"
+  [notes]="https://app.notion.com/p/<PAGE_ID>?v=<VIEW_ID>"
+  [drive]="https://drive.google.com/drive/u/1/starred"
+  [home]="https://app.notion.com/p/Home-<PAGE_ID>"
+  [thesis]="https://app.notion.com/p/Thesis-<PAGE_ID>"
+  [tasks]="https://app.notion.com/p/<PAGE_ID>?v=<VIEW_ID>"
+)
+
+BRAVE="/mnt/c/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+
+# Fullscreen video captions (YouTube CC) render fine in a window but vanish in
+# fullscreen on this setup: Chromium promotes the fullscreen video to a
+# DirectComposition overlay plane and the caption layer is lost. Verified by
+# A/B test -- captions come back with direct composition off. Keeps GPU
+# rasterization and hardware video decode; only the overlay path is disabled.
+# (Narrower --disable-features=DirectCompositionLetterboxVideoOptimization was
+# tested and did NOT fix it.)
+BRAVE_FLAGS=( --disable-direct-composition )
+
+# Single entry point so every Brave launch carries BRAVE_FLAGS. Flags only bind
+# on a cold start -- if Brave is already running, this just forwards the URL to
+# the existing instance, which already has them.
+_brave() {
+  "$BRAVE" "${BRAVE_FLAGS[@]}" "$@" < /dev/null >/dev/null 2>&1 &
+  disown
+  return 0
+}
+
+browse() {
+  if [ -z "$1" ]; then
+    echo "Bookmarks:"; printf '  %s\n' "${!BOOKMARKS[@]}" | sort; return 0
+  fi
+
+  # incognito: `browse gi` = blank window, `browse gi <query>` = incognito search
+  if [ "$1" = "gi" ]; then
+    shift
+    if [ -z "$1" ]; then
+      _brave --incognito
+    else
+      local q="$*"; q="${q// /+}"
+      _brave --incognito "https://www.google.com/search?q=${q}"
+    fi
+    return 0
+  fi
+
+  # google search: `browse g <query>`
+  if [ "$1" = "g" ]; then
+    shift
+    local q="$*"; q="${q// /+}"
+    _brave "https://www.google.com/search?q=${q}"
+    return 0
+  fi
+
+  # bookmark shortcut or raw URL
+  _brave "${BOOKMARKS[$1]:-$1}"
+}
+
+_browse_complete() {
+  COMPREPLY=( $(compgen -W "g gi ${!BOOKMARKS[*]}" -- "${COMP_WORDS[COMP_CWORD]}") )
+}
+complete -F _browse_complete browse
+
+# --- obsidian: open Obsidian (Windows Win32 app) from WSL ---
+obsidian() {
+  "/mnt/c/Users/Admin/AppData/Local/Programs/Obsidian/Obsidian.exe" < /dev/null >/dev/null 2>&1 &
+  disown
+  return 0
+}
