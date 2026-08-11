@@ -23,20 +23,27 @@ case "${1:-start}" in
   start)
     mkdir -p "$WINDIR/sessions"
     cp "$SRC" "$WINDIR/pet.ps1"
+    # Kill any existing instance first: `ensure` from a concurrently starting
+    # shell can otherwise race this and leave two pets stacked on screen.
+    "$0" stop >/dev/null 2>&1
     "$PS" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass \
       -File 'C:\Users\Admin\.claudepet\pet.ps1' </dev/null >/dev/null 2>&1 &
     disown
     echo "pet started"
     ;;
+  # NOTE: these must exclude $PID. The query string itself contains the match
+  # pattern, so the querying powershell.exe matches its own command line --
+  # without the exclusion, `stop` kills itself and `status` always reports
+  # "running".
   stop)
     "$PS" -NoProfile -Command \
-      "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { \$_.CommandLine -like '*claudepet*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }" \
+      "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { \$_.CommandLine -like '*pet.ps1*' -and \$_.ProcessId -ne \$PID } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }" \
       </dev/null >/dev/null 2>&1
     echo "pet stopped"
     ;;
   status)
     "$PS" -NoProfile -Command \
-      "if (Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { \$_.CommandLine -like '*claudepet*' }) { 'running' } else { 'not running' }" \
+      "\$n = @(Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { \$_.CommandLine -like '*pet.ps1*' -and \$_.ProcessId -ne \$PID }).Count; if (\$n -eq 0) { 'not running' } else { \"running (\$n)\" }" \
       </dev/null | tr -d '\r'
     ;;
   *)

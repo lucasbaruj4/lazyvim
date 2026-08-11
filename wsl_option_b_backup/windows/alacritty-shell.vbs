@@ -15,6 +15,13 @@ WshShell.Run "powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolic
 ' to show through. Launched before Alacritty so it's already on screen.
 WshShell.Run "powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File ""C:\Users\Admin\AppData\Local\wallpaper-window.ps1""", 0, False
 
+' Background helper: always-on-top clock overlay in the top-right corner, so
+' the time is readable from the browser without switching to the tmux bar.
+' It hides itself whenever the foreground window is truly fullscreen --
+' YouTube video fullscreen, and Alacritty (which starts fullscreen and
+' already shows the same clock in its status bar).
+WshShell.Run "powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File ""C:\Users\Admin\AppData\Local\clock-overlay.ps1""", 0, False
+
 ' Background helper: system-wide hotkey listener (GlobalHotkeys.exe) --
 ' screenshot (Shift+S), volume up/down (Ctrl+Alt+Up/Down), mute toggle
 ' (Ctrl+Shift+M). Registers real Windows global hotkeys, so they work no

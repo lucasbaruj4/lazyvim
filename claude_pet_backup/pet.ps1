@@ -1,8 +1,17 @@
 # Claude Code pet -- overlay side (Windows).
 #
-# A small always-on-top ASCII face that shows whether Claude is working, done,
-# or waiting on you. Hides itself when the foreground window is fullscreen
-# (YouTube, games) or when the terminal running Claude is already focused.
+# A small movable dot-matrix badge, after the Nothing phone glyph display.
+# Colour and word are the message:
+#   working   dim blue   WORKING    (Claude is busy; ignore it)
+#   done      green      DONE       (turn finished)
+#   waiting   amber      QUESTION   (Claude needs your input)
+#
+# Drag it anywhere; the position is remembered. The size never changes, so it
+# does not jump around under your cursor when the state changes.
+#
+# Hides entirely when the foreground window is fullscreen (YouTube, games) or
+# when the terminal running Claude is already focused. Nothing animates -- the
+# window only repaints when the state actually changes.
 #
 # Launch:  powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File pet.ps1
 
@@ -27,48 +36,86 @@ public class PetNative {
 # ---------------------------------------------------------------- config ----
 $Root      = Join-Path $env:USERPROFILE ".claudepet"
 $SessDir   = Join-Path $Root "sessions"
-$PosFile   = Join-Path $Root "position.txt"
 $HbFile    = Join-Path $Root "heartbeat"
+$PosFile   = Join-Path $Root "position.txt"
 $StaleSecs = 8 * 3600
+
 # Foreground processes that mean "you are already looking at Claude".
 $TermProcs = @("alacritty", "WindowsTerminal", "wezterm-gui", "wt")
 
-$W = 214
-$H = 78
+# Size of the badge. Same for every state -- colour and word carry the meaning,
+# not size. Tweak these two numbers to match the clock widget.
+$W = 150
+$H = 44
 
+# Dot-matrix look, after the Nothing phone glyph display: the label is rendered
+# into a tiny offscreen bitmap, then each lit pixel is drawn as a circle.
+# $DotPitch is the grid spacing in px; smaller = finer matrix, more legible
+# text, less chunky. $DotRadius is the size of each lit dot.
+$DotPitch  = 2.0
+$DotRadius = 0.8
+$Pad       = 0
+# Unlit cells, drawn faintly so the grid itself reads as a display. Ignored
+# when $Transparent is on -- an unlit grid floating over video just reads as
+# dark speckle.
+$GridAlpha = 26
+
+# $true drops the dark panel entirely: only the lit dots show, floating over
+# whatever is behind. $false brings back the rounded dark badge.
+# Caveat: with the panel gone, clicks pass through everywhere except the lit
+# dots, so dragging it means grabbing a dot. Flip this to $false if you want
+# to reposition it easily, then flip it back.
+$Transparent = $false
+$BgColor     = [Drawing.Color]::FromArgb(10, 11, 14)
+# Only used in transparent mode; must be a colour the dots never use.
+$KeyColor    = [Drawing.Color]::FromArgb(255, 0, 255)
+
+# Marquee: ms between one-column steps, and the blank gap between repeats.
+$ScrollMs  = 90
+$ScrollGap = 10
+# Mask font. Consolas is used because it stays crisp at the very small pixel
+# sizes the matrix samples from; the visible result is dots, not glyphs.
+$FontName  = "Consolas"
+
+# Per state: label, dot colour, window opacity. All fully opaque -- a
+# see-through badge picks up whatever is behind it and looks washed out. To
+# make `working` recede, dim its dot colour rather than the window.
 $Palette = @{
-  working = @{ fg = [Drawing.Color]::FromArgb(122, 162, 247); face = "[-_-]"; word = "working"  }
-  done    = @{ fg = [Drawing.Color]::FromArgb(158, 206, 106); face = "[^_^]"; word = "done"     }
-  waiting = @{ fg = [Drawing.Color]::FromArgb(224, 175, 104); face = "[o_o]?"; word = "needs you" }
+  working = @{ text = "WORKING";  fg = [Drawing.Color]::FromArgb(122, 162, 247); op = 1.00 }
+  done    = @{ text = "DONE";     fg = [Drawing.Color]::FromArgb(158, 206, 106); op = 1.00 }
+  waiting = @{ text = "QUESTION"; fg = [Drawing.Color]::FromArgb(255, 166, 46);  op = 1.00 }
 }
 
 New-Item -ItemType Directory -Force -Path $SessDir | Out-Null
 
 # ----------------------------------------------------------------- state ----
+# Uses raw .NET IO rather than Get-ChildItem/Get-Content: this runs several
+# times a second, and the cmdlet pipeline overhead dominated the pet's CPU.
 function Get-PetState {
-  $states = @()
-  $labels = @()
-  Get-ChildItem -File $SessDir -ErrorAction SilentlyContinue | ForEach-Object {
-    if (((Get-Date) - $_.LastWriteTime).TotalSeconds -gt $StaleSecs) {
-      Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue
-      return
-    }
-    $line = (Get-Content $_.FullName -First 1 -ErrorAction SilentlyContinue)
-    if (-not $line) { return }
-    $p = $line -split "`t"
-    $states += $p[0]
-    if ($p.Count -gt 1) { $labels += $p[1] }
+  $waiting = $false; $working = $false; $done = $false
+  $now = [DateTime]::UtcNow
+  try { $files = [IO.Directory]::GetFiles($SessDir) } catch { return $null }
+  foreach ($f in $files) {
+    try {
+      if (($now - [IO.File]::GetLastWriteTimeUtc($f)).TotalSeconds -gt $StaleSecs) {
+        [IO.File]::Delete($f); continue
+      }
+      $line = [IO.File]::ReadAllText($f)
+    } catch { continue }
+    if     ($line.StartsWith("waiting")) { $waiting = $true }
+    elseif ($line.StartsWith("working")) { $working = $true }
+    elseif ($line.StartsWith("done"))    { $done    = $true }
   }
-  if ($states -contains "waiting") { $s = "waiting" }
-  elseif ($states -contains "working") { $s = "working" }
-  elseif ($states -contains "done") { $s = "done" }
-  else { return $null }
-
-  $label = if ($states.Count -gt 1) { "$($states.Count) sessions" }
-           elseif ($labels.Count -gt 0) { $labels[0] }
-           else { "claude" }
-  return @{ state = $s; label = $label }
+  # Loudest state wins: if any session wants you, the badge wants you.
+  if ($waiting) { return "waiting" }
+  if ($working) { return "working" }
+  if ($done)    { return "done" }
+  return $null
 }
+
+$script:fgHandle = [IntPtr]::Zero
+$script:fgIsTerm = $false
+$script:fgBounds = [Windows.Forms.Screen]::PrimaryScreen.Bounds
 
 function Test-ShouldHide {
   param([IntPtr]$Self)
@@ -77,12 +124,22 @@ function Test-ShouldHide {
   if ($h -eq [PetNative]::GetShellWindow() -or $h -eq [PetNative]::GetDesktopWindow()) { return $false }
 
   # Already looking at the terminal? Nothing to notify.
-  $procId = 0
-  [void][PetNative]::GetWindowThreadProcessId($h, [ref]$procId)
-  try {
-    $name = (Get-Process -Id $procId -ErrorAction Stop).ProcessName
-    if ($TermProcs -contains $name) { return $true }
-  } catch { }
+  # Get-Process is by far the most expensive call here, and the foreground
+  # window rarely changes, so its result is cached per handle. The rect/style
+  # checks below stay uncached: Brave keeps the same handle when it goes
+  # fullscreen, so those must be re-read every tick.
+  if ($h -ne $script:fgHandle) {
+    $script:fgHandle = $h
+    $procId = 0
+    [void][PetNative]::GetWindowThreadProcessId($h, [ref]$procId)
+    $script:fgIsTerm = $false
+    try {
+      $name = (Get-Process -Id $procId -ErrorAction Stop).ProcessName
+      $script:fgIsTerm = ($TermProcs -contains $name)
+    } catch { }
+    $script:fgBounds = [Windows.Forms.Screen]::FromHandle($h).Bounds
+  }
+  if ($script:fgIsTerm) { return $true }
 
   # Fullscreen? Two things must hold together:
   #   1. the window covers the whole monitor
@@ -94,7 +151,7 @@ function Test-ShouldHide {
   # Bounds and geometry alone cannot separate them either.
   $r = New-Object "PetNative+RECT"
   if (-not [PetNative]::GetWindowRect($h, [ref]$r)) { return $false }
-  $scr = [Windows.Forms.Screen]::FromHandle($h).Bounds
+  $scr = $script:fgBounds
   $tol = 2
   $covers = ($r.Left -le $scr.Left + $tol) -and ($r.Top -le $scr.Top + $tol) -and
             ($r.Right -ge $scr.Right - $tol) -and ($r.Bottom -ge $scr.Bottom - $tol)
@@ -109,22 +166,26 @@ function Test-ShouldHide {
 }
 
 # ------------------------------------------------------------------ form ----
+$scr = [Windows.Forms.Screen]::PrimaryScreen.Bounds
+$pos = New-Object Drawing.Point(($scr.Left + 28), ($scr.Bottom - 28 - $H))
+if (Test-Path $PosFile) {
+  $pp = (Get-Content $PosFile -First 1) -split ','
+  if ($pp.Count -eq 2) { $pos = New-Object Drawing.Point([int]$pp[0], [int]$pp[1]) }
+}
+
 $form = New-Object Windows.Forms.Form
 $form.FormBorderStyle = 'None'
 $form.ShowInTaskbar   = $false
 $form.TopMost         = $true
 $form.StartPosition   = 'Manual'
 $form.Size            = New-Object Drawing.Size($W, $H)
-$form.BackColor       = [Drawing.Color]::FromArgb(17, 18, 24)
-$form.Opacity         = 1.0
-
-# Without this the timer-driven repaints flicker.
+$form.Location        = $pos
 $form.GetType().GetProperty("DoubleBuffered",
   [Reflection.BindingFlags]"Instance,NonPublic").SetValue($form, $true, $null)
 
-# Rounded corners.
-$rad = 14
-$gp  = New-Object Drawing.Drawing2D.GraphicsPath
+# Rounded rectangle, computed once -- the size never changes.
+$rad = 12
+$gp = New-Object Drawing.Drawing2D.GraphicsPath
 $gp.AddArc(0, 0, $rad, $rad, 180, 90)
 $gp.AddArc($W - $rad, 0, $rad, $rad, 270, 90)
 $gp.AddArc($W - $rad, $H - $rad, $rad, $rad, 0, 90)
@@ -132,52 +193,129 @@ $gp.AddArc(0, $H - $rad, $rad, $rad, 90, 90)
 $gp.CloseFigure()
 $form.Region = New-Object Drawing.Region($gp)
 
-# Same shape, inset by 1px, for the border stroke.
-$script:borderPath = New-Object Drawing.Drawing2D.GraphicsPath
-$script:borderPath.AddArc(1, 1, $rad, $rad, 180, 90)
-$script:borderPath.AddArc($W - $rad - 2, 1, $rad, $rad, 270, 90)
-$script:borderPath.AddArc($W - $rad - 2, $H - $rad - 2, $rad, $rad, 0, 90)
-$script:borderPath.AddArc(1, $H - $rad - 2, $rad, $rad, 90, 90)
-$script:borderPath.CloseFigure()
+# Matrix dimensions.
+$Cols = [int](($W - 2 * $Pad) / $DotPitch)
+$Rows = [int](($H - 2 * $Pad) / $DotPitch)
 
-# Default position: bottom-left of the primary work area.
-$wa = [Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-$pos = New-Object Drawing.Point(($wa.Left + 24), ($wa.Bottom - $H - 24))
-if (Test-Path $PosFile) {
-  $pp = (Get-Content $PosFile -First 1) -split ','
-  if ($pp.Count -eq 2) { $pos = New-Object Drawing.Point([int]$pp[0], [int]$pp[1]) }
+# Render $Text into a strip of lit/unlit cells, $Rows tall and as wide as the
+# text needs plus a gap. The strip is wider than the display and gets scrolled
+# past it, which is what makes the marquee. Font size is fitted to the row
+# count, so changing $H or $DotPitch just works.
+function Build-Strip {
+  param([string]$Text)
+  $probe = New-Object Drawing.Bitmap(1, 1)
+  $pg    = [Drawing.Graphics]::FromImage($probe)
+
+  $size = $Rows + 2
+  $font = $null
+  while ($size -gt 3) {
+    $try = New-Object Drawing.Font($FontName, $size, [Drawing.FontStyle]::Bold, [Drawing.GraphicsUnit]::Pixel)
+    if ($pg.MeasureString($Text, $try).Height -le ($Rows + 2)) { $font = $try; break }
+    $try.Dispose(); $size--
+  }
+  if (-not $font) {
+    $font = New-Object Drawing.Font($FontName, 6, [Drawing.FontStyle]::Bold, [Drawing.GraphicsUnit]::Pixel)
+  }
+
+  $textW  = [int][Math]::Ceiling($pg.MeasureString($Text, $font).Width)
+  $stripW = $textW + $ScrollGap
+  if ($stripW -lt ($Cols + $ScrollGap)) { $stripW = $Cols + $ScrollGap }
+  $pg.Dispose(); $probe.Dispose()
+
+  $bmp = New-Object Drawing.Bitmap($stripW, $Rows)
+  $g   = [Drawing.Graphics]::FromImage($bmp)
+  $g.Clear([Drawing.Color]::Black)
+  $g.TextRenderingHint = [Drawing.Text.TextRenderingHint]::SingleBitPerPixelGridFit
+  $g.DrawString($Text, $font, [Drawing.Brushes]::White, 0, 0)
+  $g.Flush()
+
+  $map = New-Object 'bool[,]' $stripW, $Rows
+  for ($y = 0; $y -lt $Rows; $y++) {
+    for ($x = 0; $x -lt $stripW; $x++) {
+      $map[$x, $y] = ($bmp.GetPixel($x, $y).R -gt 110)
+    }
+  }
+  $font.Dispose(); $g.Dispose(); $bmp.Dispose()
+  return @{ map = $map; w = $stripW }
 }
-$form.Location = $pos
 
-$faceFont = New-Object Drawing.Font("Consolas", 19, [Drawing.FontStyle]::Bold)
-$subFont  = New-Object Drawing.Font("Consolas", 9)
+# Pre-render every scroll position of a state into a finished bitmap. Animating
+# is then one image blit per frame instead of ~460 FillEllipse calls, which is
+# what keeps a moving marquee affordable on a CPU-only machine.
+function Build-Frames {
+  param([string]$State)
+  $p      = $Palette[$State]
+  $strip  = Build-Strip -Text $p.text
+  $map    = $strip.map
+  $sw     = $strip.w
+  $d      = $DotRadius * 2
+  $lit    = New-Object Drawing.SolidBrush($p.fg)
+  $unlit  = New-Object Drawing.SolidBrush(
+    [Drawing.Color]::FromArgb($GridAlpha, $p.fg.R, $p.fg.G, $p.fg.B))
 
-$script:cur   = @{ state = "working"; label = "claude" }
-$script:tick  = 0
+  $frames = New-Object 'Drawing.Bitmap[]' $sw
+  for ($f = 0; $f -lt $sw; $f++) {
+    $bmp = New-Object Drawing.Bitmap($W, $H)
+    $g   = [Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    if (-not $Transparent) { $g.Clear($BgColor) }
+    for ($y = 0; $y -lt $Rows; $y++) {
+      for ($x = 0; $x -lt $Cols; $x++) {
+        $on = $map[(($f + $x) % $sw), $y]
+        if ((-not $on) -and ($Transparent -or $GridAlpha -le 0)) { continue }
+        $cx = $Pad + $x * $DotPitch + $DotPitch / 2 - $DotRadius
+        $cy = $Pad + $y * $DotPitch + $DotPitch / 2 - $DotRadius
+        $g.FillEllipse(($(if ($on) { $lit } else { $unlit })), $cx, $cy, $d, $d)
+      }
+    }
+    $g.Dispose()
+    $frames[$f] = $bmp
+  }
+  $lit.Dispose(); $unlit.Dispose()
+  return $frames
+}
+
+# All three states are built up front. Building one takes about a second at
+# this grid density, and doing it lazily meant the badge froze for that second
+# the first time Claude asked a question -- exactly the moment it must not.
+$script:frames = @{}
+foreach ($k in $Palette.Keys) { $script:frames[$k] = Build-Frames -State $k }
+$script:cur   = "working"
+$script:frame = 0
 
 $form.Add_Paint({
   param($s, $e)
-  $g = $e.Graphics
-  $g.TextRenderingHint = [Drawing.Text.TextRenderingHint]::ClearTypeGridFit
-  $p = $Palette[$script:cur.state]
-
-  $brFace = New-Object Drawing.SolidBrush($p.fg)
-  $brSub  = New-Object Drawing.SolidBrush([Drawing.Color]::FromArgb(150, 155, 170))
-  $g.DrawString($p.face, $faceFont, $brFace, 14, 8)
-  $g.DrawString("$($p.word) . $($script:cur.label)", $subFont, $brSub, 16, 50)
-
-  # Accent bar down the left edge.
-  $g.FillRectangle($brFace, 0, 0, 3, $H)
-
-  # Hairline border so it reads as a panel against a bright page.
-  $pen = New-Object Drawing.Pen([Drawing.Color]::FromArgb(58, 62, 78))
-  $g.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
-  $g.DrawPath($pen, $script:borderPath)
-
-  $brFace.Dispose(); $brSub.Dispose(); $pen.Dispose()
+  $set = $script:frames[$script:cur]
+  if ($set) { $e.Graphics.DrawImageUnscaled($set[$script:frame % $set.Length], 0, 0) }
 })
 
-# Drag to reposition; right-click to quit.
+function Set-Look {
+  param([string]$State)
+  $form.Opacity = $Palette[$State].op
+  $script:frame = 0
+  $form.Invalidate()
+}
+
+if ($Transparent) {
+  $form.BackColor       = $KeyColor
+  $form.TransparencyKey = $KeyColor
+} else {
+  $form.BackColor = $BgColor
+}
+Set-Look -State "working"
+
+# The marquee. Separate from the state poll: it only advances while the badge
+# is actually on screen, so a hidden pet costs nothing.
+$anim = New-Object Windows.Forms.Timer
+$anim.Interval = $ScrollMs
+$anim.Add_Tick({
+  if (-not $form.Visible) { return }
+  $script:frame++
+  $form.Invalidate()
+})
+$anim.Start()
+
+# Drag to reposition; the anchor moves with it.
 $script:dragging = $false
 $script:dragOff  = New-Object Drawing.Point(0, 0)
 $form.Add_MouseDown({
@@ -200,6 +338,7 @@ $form.Add_MouseUp({
   "$($form.Location.X),$($form.Location.Y)" | Set-Content $PosFile
 })
 
+# Right-click to quit.
 $menu = New-Object Windows.Forms.ContextMenuStrip
 [void]$menu.Items.Add("Quit pet", $null, { $form.Close() })
 $form.ContextMenuStrip = $menu
@@ -212,26 +351,32 @@ $form.Add_Shown({
 })
 
 # ------------------------------------------------------------------ loop ----
+# Two cadences on one timer. Show/hide runs every tick so the badge is there
+# the instant you switch to Brave -- it is only P/Invoke calls, no disk. The
+# session-state read touches the filesystem, so it runs every 5th tick.
 $timer = New-Object Windows.Forms.Timer
-$timer.Interval = 700
+$timer.Interval = 120
+$script:tick  = 0
+$script:state = $null
 $timer.Add_Tick({
   $script:tick++
+
+  if ($script:tick % 5 -eq 1) { $script:state = Get-PetState }
+
   # Heartbeat, ~every 3.5s. Lets the WSL side answer "is the pet already
   # running?" with a plain stat instead of spawning powershell.exe.
-  if ($script:tick % 5 -eq 0) {
+  if ($script:tick % 29 -eq 0) {
     Set-Content -Path $HbFile -Value $script:tick -ErrorAction SilentlyContinue
   }
-  $st = Get-PetState
-  $hide = (-not $st) -or (Test-ShouldHide -Self $form.Handle)
 
-  if ($hide) {
+  if ((-not $script:state) -or (Test-ShouldHide -Self $form.Handle)) {
     if ($form.Visible) { $form.Hide() }
     return
   }
 
-  if ($st.state -ne $script:cur.state -or $st.label -ne $script:cur.label) {
-    $script:cur = $st
-    $form.Invalidate()
+  if ($script:state -ne $script:cur) {
+    $script:cur = $script:state
+    Set-Look -State $script:state
   }
   if (-not $form.Visible) { $form.Show() }
   $form.TopMost = $true
