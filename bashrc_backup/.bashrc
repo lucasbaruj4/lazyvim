@@ -237,3 +237,11 @@ claude() {
 
 # GitHub PAT for MCP (file is 600, never committed)
 [ -f "$HOME/.config/secrets/github-pat.env" ] && . "$HOME/.config/secrets/github-pat.env"
+
+# --- Claude Code pet: always-on-top overlay showing whether Claude is working,
+# done, or waiting on you. Alacritty is the Windows login shell here, so there
+# is no explorer.exe and hence no Startup folder or Run key -- starting it from
+# the shell is the equivalent of "on logon". `ensure` is a single stat when the
+# pet is already up, so panes after the first cost nothing.
+[[ $- == *i* ]] && [ -x "$HOME/.claude/pet/pet.sh" ] && \
+  ( "$HOME/.claude/pet/pet.sh" ensure >/dev/null 2>&1 & )
