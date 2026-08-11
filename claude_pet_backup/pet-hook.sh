@@ -27,5 +27,18 @@ if [ "$STATE" = "gone" ]; then
   exit 0
 fi
 
+# The Notification hook fires for two different things: a permission or
+# multiple-choice prompt DURING a turn, and an idle "waiting for your input"
+# notice AFTER one ends. The idle one arrives just after Stop and would
+# overwrite `done` with `waiting`, so the badge read QUESTION every time Claude
+# finished. Within a turn the order is always working -> (waiting) -> done, so
+# once a session is done its turn is over and any further notification is idle
+# chatter -- ignore it. UserPromptSubmit resets to working on the next turn.
+if [ "$STATE" = "waiting" ] && [ -f "$DIR/$sid" ]; then
+  case "$(cat "$DIR/$sid" 2>/dev/null)" in
+    done*) exit 0 ;;
+  esac
+fi
+
 printf '%s\t%s\t%s\n' "$STATE" "$label" "$(date +%s)" > "$DIR/$sid" 2>/dev/null
 exit 0
