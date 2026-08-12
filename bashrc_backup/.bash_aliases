@@ -36,6 +36,7 @@ declare -A BOOKMARKS=(
   [outlook]="https://outlook.office.com/mail/?realm=<REALM>&login_hint=<EMAIL>"
   [x]="https://x.com/home"
   [ig]="https://www.instagram.com/?hl=en"
+  [whatsapp]="https://web.whatsapp.com"
   [notes]="https://app.notion.com/p/<PAGE_ID>?v=<VIEW_ID>"
   [drive]="https://drive.google.com/drive/u/1/starred"
   [home]="https://app.notion.com/p/Home-<PAGE_ID>"
