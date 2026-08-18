@@ -55,6 +55,11 @@ tmp=$(mktemp "$V/queue/.pending.XXXXXX") || exit 0
 { printf '%s\n' "$label"; printf '%s\n' "$clean"; } > "$tmp"
 mv "$tmp" "$V/queue/$(date +%s%N).txt"
 
+# Keep the latest output per window so Alt+R can replay it.
+mkdir -p "$V/last"
+key=$(printf '%s' "$label" | tr -c '[:alnum:]' '_')
+{ printf '%s\n' "$label"; printf '%s\n' "$clean"; } > "$V/last/$key.txt"
+
 # Harmless if one is already draining: player.sh takes a lock and exits.
 setsid "$V/player.sh" >/dev/null 2>&1 &
 echo $! > "$V/pid"

@@ -9,7 +9,8 @@ Manually-synced copies of the live files in `~/.claude/voice/`.
 | Key | Does |
 |---|---|
 | `Alt+V` | Start recording; press again to transcribe and type the text into the pane |
-| `Alt+S` | Stop speech mid-sentence; press again while silent to mute/unmute |
+| `Alt+S` | Stop speech and clear the queue; press again while silent to mute/unmute |
+| `Alt+R` | Replay the last output spoken for the current tmux window |
 
 Dictation **sends the message immediately** — attach screenshots before
 dictating, not after. Change the voice with `voice.sh set <name>`; `voice.sh
@@ -27,6 +28,7 @@ Bindings live in `../tmux_backup/.tmux.conf`. Both use `run-shell -b` — withou
 | `transcribe.py` | One-shot Whisper call; holds the vocabulary prompt |
 | `speak.sh` | Cleans stdin and queues it; does not play anything itself |
 | `player.sh` | Drains the queue, one item at a time, across all sessions |
+| `repeat.sh` | `Alt+R` replay; reads the per-window copy kept in `last/` |
 | `stop-hook.sh` | Claude Code `Stop` hook; speaks the final message of a turn |
 | `shush.sh` | `Alt+S` stop/mute |
 | `voice.sh` | list / demo / set the voice |
@@ -55,7 +57,9 @@ reply is never cut off by another pane finishing. When the speaker changes, the
 player announces "Now reading the output of session X", taking X from the tmux
 window name. Consecutive replies from the same session are not announced.
 
-`Alt+S` stops the current item **and** clears the queue.
+`Alt+S` stops the current item **and** clears the queue. `Alt+R` replays the
+last output for the window you are in -- `speak.sh` keeps one copy per window
+under `last/`, keyed by window name, so each pane replays its own answer.
 
 Rendering is chunked: the first sentence is rendered and played while the rest
 is still being synthesised. This matters because a `-high` voice runs at only
