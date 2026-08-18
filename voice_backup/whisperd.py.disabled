@@ -1,0 +1,42 @@
+"""Persistent Whisper daemon: loads the model once, transcribes on request.
+Protocol: client sends one line (wav path), gets one line (text) back."""
+import os, socket, socketserver, sys
+from faster_whisper import WhisperModel
+
+HOST, PORT = "127.0.0.1", 8765
+
+# Biases the decoder toward the words Lucas actually says. Without this,
+# "Alt+V" comes out as "all V" and "tmux" as "tea mux".
+PROMPT = (
+    "Transcript of a software developer dictating to Claude Code in a terminal. "
+    "Keyboard shortcuts: Alt+V, Alt+S, Ctrl+C, Ctrl+R, Shift, Esc, F2 prefix. "
+    "Tools: tmux, Alacritty, WSL, nvim, git, GitHub, pnpm, npm, bash, jq, curl, "
+    "systemd, Piper, Whisper, faster-whisper, Notion, Claude Code, MCP, CLI, TTS, STT. "
+    "Concepts: repo, commit, rebase, hook, daemon, venv, aarch64, latency, async, "
+    "idempotent, middleware, Postgres, JSON, YAML, stdin, stdout, regex, API."
+)
+
+class Handler(socketserver.StreamRequestHandler):
+    def handle(self):
+        path = self.rfile.readline().decode().strip()
+        if not path or not os.path.exists(path):
+            self.wfile.write(b"\n"); return
+        try:
+            segs, _ = MODEL.transcribe(
+                path, beam_size=1, vad_filter=True,
+                condition_on_previous_text=False, initial_prompt=PROMPT,
+            )
+            text = " ".join(s.text.strip() for s in segs).strip()
+        except Exception as e:
+            print("error:", e, file=sys.stderr, flush=True)
+            text = ""
+        self.wfile.write((text + "\n").encode())
+
+class Server(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+
+if __name__ == "__main__":
+    size = os.environ.get("WHISPER_MODEL", "small.en")
+    MODEL = WhisperModel(size, device="cpu", compute_type="int8", local_files_only=True)
+    print(f"whisperd ready: {size}", flush=True)
+    Server((HOST, PORT), Handler).serve_forever()
