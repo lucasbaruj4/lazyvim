@@ -50,7 +50,11 @@ if [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF")" 2>/dev/null; then
   fi
   if [ -n "$PANE" ] && [ -n "${TMUX:-}" ]; then
     tmux send-keys -t "$PANE" -l "$text"
-    msg "typed: ${text:0:50}"
+    # Send it straight away. Attach screenshots BEFORE dictating, since the
+    # message goes the moment the transcript lands.
+    sleep 0.2
+    tmux send-keys -t "$PANE" Enter
+    msg "sent: ${text:0:50}"
   else
     printf '%s\n' "$text"
   fi

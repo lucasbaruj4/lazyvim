@@ -11,6 +11,11 @@ Manually-synced copies of the live files in `~/.claude/voice/`.
 | `Alt+V` | Start recording; press again to transcribe and type the text into the pane |
 | `Alt+S` | Stop speech mid-sentence; press again while silent to mute/unmute |
 
+Dictation **sends the message immediately** — attach screenshots before
+dictating, not after. Change the voice with `voice.sh set <name>`; `voice.sh
+demo` plays every installed voice. Voices live in `~/.claude/voice/voices/`
+and are not in git.
+
 Bindings live in `../tmux_backup/.tmux.conf`. Both use `run-shell -b` — without
 `-b` the whole tmux server freezes for the length of the transcription.
 
@@ -23,6 +28,8 @@ Bindings live in `../tmux_backup/.tmux.conf`. Both use `run-shell -b` — withou
 | `speak.sh` | Reads stdin aloud via Piper; strips code blocks and markdown |
 | `stop-hook.sh` | Claude Code `Stop` hook; speaks the final message of a turn |
 | `shush.sh` | `Alt+S` stop/mute |
+| `voice.sh` | list / demo / set the voice |
+| `voice.conf` | the currently selected voice |
 | `whisperd.py.disabled` | Abandoned persistent daemon — see Gotchas |
 
 ## Rebuilding on a new machine
@@ -38,6 +45,33 @@ Not in git: the Piper binary, the voice model, and the Python venv (600MB+).
    cache; after that `local_files_only=True` keeps it offline.
 4. Register `stop-hook.sh` in the `Stop` array of `~/.claude/settings.json`,
    alongside the pet hook.
+
+## Playback goes through Windows, not WSLg
+
+`speak.sh` writes a wav into the Windows temp directory and plays it with
+PowerShell's `SoundPlayer`. That looks like a detour and it is not — **WSLg's
+audio is the problem.** Playing through PulseAudio produced dropouts scattered
+right through the middle of every sentence, badly enough to hurt comprehension.
+
+What was tried and rejected, in order:
+
+| Attempt | Result |
+|---|---|
+| `paplay`, default buffer | scattered dropouts |
+| `paplay --latency-msec=500` | much worse |
+| `paplay --latency-msec=30` | much worse still |
+| 44100 stereo via ffmpeg | dramatically worse |
+| `ffplay` instead of `paplay` | worse, and slower to start |
+| **wav → Windows `SoundPlayer`** | **clean** |
+
+Two independent Linux clients failing the same way put the fault below both.
+Do not "simplify" this back to `paplay`. The PulseAudio path is kept only as a
+fallback for when interop is unavailable.
+
+Worth knowing: none of this was visible from inside WSL. Recording the sink
+monitor showed byte-perfect audio — same length, no gaps, no saturation — while
+it sounded broken at the speakers. The fault is past the last point Linux can
+measure, so listening was the only reliable instrument.
 
 ## Gotchas
 
@@ -61,6 +95,13 @@ Each of these cost real debugging time:
 - **The Stop hook speaks only the final message.** A turn is many text blocks
   interleaved with tool calls; the lead-ins narrate work in progress and are
   deliberately skipped.
+
+- **The Whisper prompt caps at 224 tokens** and is silently truncated past
+  that. The current one is ~178. Measure with the tokenizer before adding
+  words; it carries the repo names, so new projects belong there.
+- **The Stop hook must wait for the transcript to settle.** It fires while
+  Claude Code is still flushing the final message, so reading immediately gets
+  the previous block instead.
 
 Transcription takes ~4s per utterance. `WHISPER_MODEL=base.en` is ~2s and
 noticeably worse on technical words.
