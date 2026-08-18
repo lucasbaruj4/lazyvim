@@ -25,7 +25,8 @@ Bindings live in `../tmux_backup/.tmux.conf`. Both use `run-shell -b` — withou
 |---|---|
 | `dictate.sh` | `Alt+V` toggle: record → transcribe → type |
 | `transcribe.py` | One-shot Whisper call; holds the vocabulary prompt |
-| `speak.sh` | Reads stdin aloud via Piper; strips code blocks and markdown |
+| `speak.sh` | Cleans stdin and queues it; does not play anything itself |
+| `player.sh` | Drains the queue, one item at a time, across all sessions |
 | `stop-hook.sh` | Claude Code `Stop` hook; speaks the final message of a turn |
 | `shush.sh` | `Alt+S` stop/mute |
 | `voice.sh` | list / demo / set the voice |
@@ -45,6 +46,21 @@ Not in git: the Piper binary, the voice model, and the Python venv (600MB+).
    cache; after that `local_files_only=True` keeps it offline.
 4. Register `stop-hook.sh` in the `Stop` array of `~/.claude/settings.json`,
    alongside the pet hook.
+
+## One queue, many sessions
+
+Several Claude Code sessions in different tmux panes share one queue. `speak.sh`
+only *enqueues*; a single `player.sh` holds a lock and drains it in order, so a
+reply is never cut off by another pane finishing. When the speaker changes, the
+player announces "Now reading the output of session X", taking X from the tmux
+window name. Consecutive replies from the same session are not announced.
+
+`Alt+S` stops the current item **and** clears the queue.
+
+Rendering is chunked: the first sentence is rendered and played while the rest
+is still being synthesised. This matters because a `-high` voice runs at only
+~0.27x realtime -- rendering a long answer in one go meant ~36s of silence
+first, versus ~1s now.
 
 ## Playback goes through Windows, not WSLg
 
@@ -99,6 +115,9 @@ Each of these cost real debugging time:
 - **The Whisper prompt caps at 224 tokens** and is silently truncated past
   that. The current one is ~178. Measure with the tokenizer before adding
   words; it carries the repo names, so new projects belong there.
+- **Text is filtered before synthesis.** Commit hashes, `--flags`, paths and
+  filenames like `speak.sh` are gibberish when read aloud, so they are stripped
+  or reduced. Add new patterns to the second `sed` in `speak.sh`.
 - **The Stop hook must wait for the transcript to settle.** It fires while
   Claude Code is still flushing the final message, so reading immediately gets
   the previous block instead.
