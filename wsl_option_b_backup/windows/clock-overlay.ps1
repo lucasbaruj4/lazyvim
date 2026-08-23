@@ -20,6 +20,9 @@
 #     WS_MAXIMIZE bit); a real fullscreen window drops the caption.
 
 $logPath = "C:\Users\Admin\AppData\Local\clock-overlay.log"
+# GlobalHotkeys.exe writes a new token here for each Ctrl+, press made while
+# Brave is focused. The token is an event, not saved visibility state.
+$toggleSignalPath = "C:\Users\Admin\AppData\Local\clock-overlay.toggle"
 "[$(Get-Date -Format o)] starting" | Out-File -FilePath $logPath -Append
 
 # Set to $true to log the foreground window's title/rect/style on every
@@ -90,10 +93,10 @@ public class Win32 {
     # or they come out as empty boxes. "NFM" is the mono variant -- this is
     # columnar status text, same as the bar it copies.
     $fontName = "CaskaydiaMono NFM"
-    $fontSize = 16
+    $fontSize = 15
     $margin   = 20       # gap from the bottom-right screen corner
-    $padX     = 20
-    $padY     = 9
+    $padX     = 14
+    $padY     = 7
 
     # Grid geometry, same values the pet uses.
     $DotPitch  = 2.0
@@ -126,9 +129,16 @@ public class Win32 {
     $script:dotCols   = 0
     $script:dotRows   = 0
 
-    $litBrush   = New-Object System.Drawing.SolidBrush($fg)
-    $unlitBrush = New-Object System.Drawing.SolidBrush(
-        [System.Drawing.Color]::FromArgb($GridAlpha, $fg.R, $fg.G, $fg.B))
+    # Sixteen brightness steps let edge dots taper instead of snapping from
+    # fully dark to fully lit. The marks are still discrete circles; only their
+    # intensity changes, like a real low-resolution LED matrix photographed
+    # slightly out of focus.
+    $dotBrushes = @()
+    for ($level = 0; $level -lt 16; $level++) {
+        $alpha = [int]($GridAlpha + ($level / 15.0) * (255 - $GridAlpha))
+        $dotBrushes += New-Object System.Drawing.SolidBrush(
+            [System.Drawing.Color]::FromArgb($alpha, $fg.R, $fg.G, $fg.B))
+    }
 
     # Render $Text into a $Cols x $Rows grid and record which cells are lit.
     # The mask font size is fitted to the row count, so the grid stays filled
@@ -138,7 +148,9 @@ public class Win32 {
         $bmp = New-Object System.Drawing.Bitmap($Cols, $Rows)
         $g   = [System.Drawing.Graphics]::FromImage($bmp)
         $g.Clear([System.Drawing.Color]::Black)
-        $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::SingleBitPerPixelGridFit
+        # Sample smooth glyph shapes, then apply the hard threshold below. This
+        # keeps every visible dot fully lit without breaking thin letter strokes.
+        $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
 
         $fmt = New-Object System.Drawing.StringFormat
         $fmt.Alignment     = [System.Drawing.StringAlignment]::Center
@@ -162,35 +174,34 @@ public class Win32 {
             (New-Object System.Drawing.RectangleF(0, 0, $Cols, $Rows)), $fmt)
         $g.Flush()
 
-        $map = New-Object 'bool[,]' $Cols, $Rows
+        $map = New-Object 'byte[,]' $Cols, $Rows
         for ($y = 0; $y -lt $Rows; $y++) {
             for ($x = 0; $x -lt $Cols; $x++) {
-                $map[$x, $y] = ($bmp.GetPixel($x, $y).R -gt 110)
+                # Preserve partial edge coverage so small glyphs stay smooth,
+                # with a mild brightness boost so the text remains visible.
+                $coverage = $bmp.GetPixel($x, $y).R / 255.0
+                $map[$x, $y] = [byte][math]::Min(15,
+                    [math]::Round([math]::Pow($coverage, 0.62) * 15))
             }
         }
         $mask.Dispose(); $g.Dispose(); $bmp.Dispose()
         # NOTE the comma: returning a 2-D array bare makes PowerShell enumerate
-        # it into loose booleans, and $map[$x,$y] on the resulting 1-D array
-        # returns a 2-element slice, which is always truthy -- every cell reads
-        # as lit and the panel fills solid. `,$map` returns the array itself.
+        # it into loose bytes. `,$map` returns the array itself.
         return ,$map
     }
 
     $form.Add_Paint({
         param($sender, $e)
         try {
-            if (-not $script:dotMap) { return }
-            $e.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-            $d = $DotRadius * 2
-            for ($y = 0; $y -lt $script:dotRows; $y++) {
-                for ($x = 0; $x -lt $script:dotCols; $x++) {
-                    $cx = $DotPad + $x * $DotPitch + $DotPitch / 2 - $DotRadius
-                    $cy = $DotPad + $y * $DotPitch + $DotPitch / 2 - $DotRadius
-                    $e.Graphics.FillEllipse(
-                        ($(if ($script:dotMap[$x, $y]) { $litBrush } else { $unlitBrush })),
-                        $cx, $cy, $d, $d)
-                }
-            }
+            [System.Windows.Forms.TextRenderer]::DrawText(
+                $e.Graphics,
+                $script:barText,
+                $font,
+                $form.ClientRectangle,
+                $fg,
+                ([System.Windows.Forms.TextFormatFlags]::HorizontalCenter -bor
+                 [System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor
+                 [System.Windows.Forms.TextFormatFlags]::NoPadding))
         } catch {
             "[$(Get-Date -Format o)] Paint error: $_" | Out-File -FilePath $logPath -Append
         }
@@ -359,10 +370,9 @@ public class Win32 {
         $form.Invalidate()
     }
 
-    # The clock is pinned to the browser: it only exists while a browser window
-    # is the one you're looking at. Anywhere else (terminal included) it is
-    # simply not there, so it can never cover the tmux status bar.
-    $browserProcesses = @('brave', 'chrome', 'msedge', 'firefox', 'vivaldi', 'zen')
+    # The overlay belongs to Brave only. It never appears over the terminal or
+    # any other browser/application.
+    $browserProcesses = @('brave')
 
     $script:lastHwnd    = [IntPtr]::Zero
     $script:lastIsBrowser = $false
@@ -399,7 +409,15 @@ public class Win32 {
         return ($style -band $WS_CAPTION) -ne $WS_CAPTION
     }
 
-    $script:hidden = $false  # matches the initial Show() below
+    # Enabled by default on every start. Read the current token so an event from
+    # an older process is not replayed after a restart.
+    $script:enabled = $true
+    $script:lastToggleToken = ''
+    if ([System.IO.File]::Exists($toggleSignalPath)) {
+        try { $script:lastToggleToken = [System.IO.File]::ReadAllText($toggleSignalPath) } catch { }
+    }
+    # Start hidden; the first timer tick shows it only if Brave qualifies.
+    $script:hidden = $true
 
     $timer = New-Object System.Windows.Forms.Timer
     # 120ms, not 1s: at 1s the pill visibly lingered for a beat after switching
@@ -409,14 +427,24 @@ public class Win32 {
     $timer.Add_Tick({
         try {
             Update-Status
+            # Consume each Brave-only Ctrl+, event once.
+            $toggleToken = $script:lastToggleToken
+            if ([System.IO.File]::Exists($toggleSignalPath)) {
+                try { $toggleToken = [System.IO.File]::ReadAllText($toggleSignalPath) } catch { }
+            }
+            if ($toggleToken -ne $script:lastToggleToken) {
+                $script:lastToggleToken = $toggleToken
+                $script:enabled = -not $script:enabled
+            }
+
             $fg = [Win32]::GetForegroundWindow()
-            # Visible only when a browser is in front and not in video
-            # fullscreen. Our own window as foreground is ignored -- reusing
-            # the previous decision -- so the pill can't flicker itself away.
-            if ($fg -eq [IntPtr]::Zero -or $fg -eq $form.Handle) {
-                $shouldHide = $script:hidden
-            } else {
-                $shouldHide = -not ((Test-ForegroundIsBrowser $fg) -and (-not (Test-ForegroundFullscreen $fg)))
+            # Exactly one visibility rule: enabled AND Brave foreground AND not
+            # true fullscreen. Every other state is hidden.
+            $shouldHide = $true
+            if ($fg -ne [IntPtr]::Zero -and $fg -ne $form.Handle) {
+                $shouldHide = -not ($script:enabled -and
+                    (Test-ForegroundIsBrowser $fg) -and
+                    (-not (Test-ForegroundFullscreen $fg)))
             }
             if ($alwaysShow) { $shouldHide = $false }
             if ($shouldHide -ne $script:hidden) {
@@ -450,9 +478,11 @@ public class Win32 {
     })
 
     Update-Status
-    $form.Show()
-    [void][Win32]::SetWindowPos($form.Handle, $HWND_TOPMOST, 0, 0, 0, 0,
-        ($SWP_NOMOVE -bor $SWP_NOSIZE -bor $SWP_NOACTIVATE))
+    if (-not $script:hidden) {
+        $form.Show()
+        [void][Win32]::SetWindowPos($form.Handle, $HWND_TOPMOST, 0, 0, 0, 0,
+            ($SWP_NOMOVE -bor $SWP_NOSIZE -bor $SWP_NOACTIVATE))
+    }
     $timer.Start()
 
     "[$(Get-Date -Format o)] entering message loop" | Out-File -FilePath $logPath -Append

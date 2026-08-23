@@ -167,10 +167,29 @@ function Test-ShouldHide {
 
 # ------------------------------------------------------------------ form ----
 $scr = [Windows.Forms.Screen]::PrimaryScreen.Bounds
-$pos = New-Object Drawing.Point(($scr.Left + 28), ($scr.Bottom - 28 - $H))
+$defaultPos = New-Object Drawing.Point(($scr.Left + 28), ($scr.Bottom - 28 - $H))
+$pos = $defaultPos
 if (Test-Path $PosFile) {
   $pp = (Get-Content $PosFile -First 1) -split ','
-  if ($pp.Count -eq 2) { $pos = New-Object Drawing.Point([int]$pp[0], [int]$pp[1]) }
+  if ($pp.Count -eq 2) {
+    $saved = New-Object Drawing.Point([int]$pp[0], [int]$pp[1])
+    # Display scaling or monitor changes can leave the remembered physical
+    # coordinate outside today's logical WinForms bounds. Accept it only when
+    # the whole badge fits on a currently attached screen.
+    $fits = $false
+    foreach ($screen in [Windows.Forms.Screen]::AllScreens) {
+      $b = $screen.Bounds
+      if ($saved.X -ge $b.Left -and $saved.Y -ge $b.Top -and
+          ($saved.X + $W) -le $b.Right -and ($saved.Y + $H) -le $b.Bottom) {
+        $fits = $true; break
+      }
+    }
+    if ($fits) {
+      $pos = $saved
+    } else {
+      "$($defaultPos.X),$($defaultPos.Y)" | Set-Content $PosFile
+    }
+  }
 }
 
 $form = New-Object Windows.Forms.Form
