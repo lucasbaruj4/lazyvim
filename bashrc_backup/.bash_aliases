@@ -104,3 +104,13 @@ obsidian() {
   disown
   return 0
 }
+
+# --- CLIProxyAPI: Claude Code on ChatGPT/Codex subscription ---
+claudex() {
+  local key
+  key="$(cat ~/.cli-proxy-api/.claudex-key 2>/dev/null)" || { echo "no claudex key"; return 1; }
+  ANTHROPIC_BASE_URL=http://127.0.0.1:8317 \
+  ANTHROPIC_AUTH_TOKEN="$key" \
+  CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1 \
+  claude "$@"
+}

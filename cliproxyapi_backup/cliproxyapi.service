@@ -1,0 +1,13 @@
+[Unit]
+Description=CLIProxyAPI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/cliproxyapi
+ExecStart=%h/cliproxyapi/cli-proxy-api -config %h/cliproxyapi/config.yaml
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
