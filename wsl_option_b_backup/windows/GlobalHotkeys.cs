@@ -17,6 +17,7 @@ using System.Windows.Forms;
 // part of explorer.exe, which this machine doesn't run, so leaving it enabled
 // produces half-drawn/ghost windows.
 class HotkeyListener : Form {
+    [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
     [DllImport("user32.dll")] static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -228,6 +229,7 @@ class HotkeyListener : Form {
 
     [STAThread]
     static void Main() {
+        SetProcessDPIAware();
         Application.EnableVisualStyles();
         Application.Run(new HotkeyListener());
     }
