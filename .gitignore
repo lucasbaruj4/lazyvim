@@ -6,3 +6,7 @@ debug
 foo.*
 *.log
 data
+cliproxyapi_backup/config.yaml
+cliproxyapi_backup/.claudex-key
+cliproxyapi_backup/claude-*.json
+cliproxyapi_backup/codex-*.json

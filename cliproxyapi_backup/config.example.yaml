@@ -6,4 +6,5 @@ api-keys:
 debug: false
 remote-management:
   allow-remote: false
+  secret-key: "REPLACE_WITH_GENERATED_KEY"
 request-retry: 3

@@ -6,6 +6,14 @@ Uses OAuth subscription logins, no API keys.
 
 Upstream: https://github.com/router-for-me/CLIProxyAPI
 
+## Files
+
+| File | Role |
+| --- | --- |
+| `config.example.yaml` | Local-only proxy config with placeholders for the generated key. |
+| `cliproxyapi.service` | systemd user service that starts the proxy at login. |
+| `statusline-usage.sh` | Claude Code status line that shows the active Claude or ChatGPT subscription limits. |
+
 ## Restore
 
 1. Download the release binary into `~/cliproxyapi/`:
@@ -38,12 +46,29 @@ Upstream: https://github.com/router-for-me/CLIProxyAPI
    copy the full `?code=...&state=...` URL from the address bar and paste it at
    the prompt instead of pressing Enter.
 
-5. The `claudex` shell function lives in `bashrc_backup/.bash_aliases`.
+5. Install the subscription usage status line without replacing other Claude
+   Code settings:
+
+       mkdir -p ~/.claude
+       install -m 755 statusline-usage.sh ~/.claude/statusline-usage.sh
+       [ -s ~/.claude/settings.json ] || printf '{}\n' > ~/.claude/settings.json
+       tmp=$(mktemp)
+       jq '.statusLine = {type: "command", command: "~/.claude/statusline-usage.sh"}' \
+         ~/.claude/settings.json > "$tmp" && mv "$tmp" ~/.claude/settings.json
+
+6. The `claudex` shell function lives in `bashrc_backup/.bash_aliases`.
 
 ## Notes
 
-- `~/cliproxyapi/config.yaml` and `~/.cli-proxy-api/` hold live credentials and
-  are never committed here.
+- `~/cliproxyapi/config.yaml`, `~/.cli-proxy-api/`, `~/.claude/settings.json`,
+  and status-line cache files are live state and are never copied here.
+- The generated key fills both `api-keys` and `remote-management.secret-key`.
+  Management stays bound to localhost. CLIProxyAPI replaces the management key
+  with a bcrypt hash on first start; never copy the live config back over the
+  example file.
+- The status line reads the key at runtime, fetches only quota percentages, and
+  caches those percentages for 60 seconds under `~/.claude/cache/`.
+- The status line requires `bash`, `curl`, `jq`, `awk`, and `flock`.
 - Plain `claude` is untouched and still talks straight to Anthropic. Only
   `claudex` routes through the proxy.
 - Routing the Anthropic OAuth token through a third-party proxy is what got
