@@ -1,6 +1,9 @@
 # clock-overlay.ps1
-# Always-on-top clock, styled like the tmux status bar, so the time is
-# readable without switching to the terminal (mainly while in the browser).
+# Always-on-top copy of the tmux status bar, so its contents are readable
+# without switching to the terminal (mainly while in the browser).
+#
+# Shows the same four fields as `status-right` in ~/.tmux.conf, in the same
+# order and with the same icons:  volume | battery | date+time | wifi
 #
 # Behaviour:
 #   - click-through and never focusable (WS_EX_TRANSPARENT | WS_EX_NOACTIVATE),
@@ -82,7 +85,11 @@ public class Win32 {
     # scrolls, the clock does not.
     $fg      = [System.Drawing.ColorTranslator]::FromHtml("#ffffff")
     $bg      = [System.Drawing.Color]::FromArgb(10, 11, 14)   # same panel as the pet
-    $fontName = "Consolas"   # mask font: stays crisp at the tiny sizes the grid samples
+    # Mask font. The tmux bar's icons (battery, volume, wifi) live in the Nerd
+    # Font private-use range, so the font sampled by the grid has to carry them
+    # or they come out as empty boxes. "NFM" is the mono variant -- this is
+    # columnar status text, same as the bar it copies.
+    $fontName = "CaskaydiaMono NFM"
     $fontSize = 16
     $margin   = 20       # gap from the bottom-right screen corner
     $padX     = 20
@@ -114,7 +121,7 @@ public class Win32 {
         [System.Reflection.BindingFlags]::NonPublic -bor [System.Reflection.BindingFlags]::Instance
     ).SetValue($form, $true, $null)
 
-    $script:clockText = ""
+    $script:barText   = ""
     $script:dotMap    = $null
     $script:dotCols   = 0
     $script:dotRows   = 0
@@ -198,19 +205,125 @@ public class Win32 {
 
     $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 
-    $script:lastMinute = -1
+    # --- hardware fields, read from the same sources as the tmux bar --------
+    # AudioCtl.exe / BatteryCtl.exe are the precompiled helpers that
+    # ~/.local/bin/tmux-volume and tmux-battery already shell out to, and netsh
+    # is what tmux-hw-status.sh calls. Going to the source directly (rather
+    # than reading ~/.cache/tmux-hw) means the overlay is still correct when
+    # no tmux client is attached to refresh that cache.
+    $script:hw = [hashtable]::Synchronized(@{ volume = ''; battery = ''; wifi = '' })
 
-    function Update-Clock {
-        # Ticking 8x a second, so bail on an int compare before doing any date
-        # formatting or string allocation -- only the minute rollover matters.
-        $now = [datetime]::Now
-        if ($now.Minute -eq $script:lastMinute) { return }
-        $script:lastMinute = $now.Minute
+    $probeScript = {
+        $AUDIO = "C:\Users\Admin\AppData\Local\AudioCtl.exe"
+        $BATT  = "C:\Users\Admin\AppData\Local\BatteryCtl.exe"
+        $NETSH = Join-Path $env:SystemRoot "System32\netsh.exe"
 
-        # Time only -- the tmux bar keeps the full "%a %d %b %H:%M" version.
-        $text = $now.ToString("HH:mm", [System.Globalization.CultureInfo]::InvariantCulture)
-        if ($script:clockText -eq $text) { return }
-        $script:clockText = $text
+        # Icons are built from codepoints instead of pasted in literally so this
+        # file stays pure ASCII: Windows PowerShell 5.1 reads a BOM-less UTF-8
+        # script as ANSI, which would mangle any literal glyph.
+        function G { param([int]$cp) [char]::ConvertFromUtf32($cp) }
+        $icoBolt = G 0xF0E7
+        $battIco = @((G 0xF244), (G 0xF243), (G 0xF242), (G 0xF241), (G 0xF240))
+        $icoMute = G 0xF0581 ; $icoZero = G 0xF075F
+        $icoLow  = G 0xF027  ; $icoHigh = G 0xF028
+        $icoWifi = G 0xF0928 ; $icoOff  = G 0xF092D
+        $blkFull = [char]0x2588 ; $blkEmpty = [char]0x2591
+
+        function Read-Volume {
+            $raw = [string](& $AUDIO status 2>$null)
+            if (-not $raw) { return '' }
+            $pct = 80 ; $muted = $false
+            if ($raw -match 'volume=([0-9.]+)') { $pct = [int][math]::Round([double]$Matches[1]) }
+            if ($raw -match 'muted=(\w+)')      { $muted = ($Matches[1] -eq 'True') }
+            if ($muted) { return "$icoMute  x" }
+            $pct = [math]::Max(0, [math]::Min(100, $pct))
+            $icon = if ($pct -eq 0) { $icoZero } elseif ($pct -lt 30) { $icoLow } else { $icoHigh }
+            # 3 segments at 34/67/100 -- tmux-volume's thresholds, picked so the
+            # last block can actually fill when pct tops out at 100.
+            $bar = ''
+            foreach ($i in 1..3) {
+                $bar += if ($pct -ge [int](($i * 100 + 2) / 3)) { $blkFull } else { $blkEmpty }
+            }
+            "$icon  $bar $pct%"
+        }
+
+        function Read-Battery {
+            $raw = [string](& $BATT 2>$null)
+            if (-not $raw) { return '' }
+            $f = $raw.Trim() -split '\s+'
+            if ($f.Count -lt 2) { return '' }
+            $pct = [int]$f[0] ; $st = [int]$f[1]
+            # BatteryStatus 2,6,7,8,9 all mean on-AC/charging -- same list as
+            # tmux-battery, which shows a bolt for all of them.
+            if (@(2,6,7,8,9) -contains $st) { return "$icoBolt $pct%" }
+            # 0-19,20-39,40-59,60-79,80+ -> the five discharge icons.
+            $tier = [math]::Min(4, [math]::Max(0, [int][math]::Floor($pct / 20)))
+            "$($battIco[$tier]) $pct%"
+        }
+
+        function Read-Wifi {
+            $info = & $NETSH wlan show interfaces 2>$null
+            if (-not $info) { return "$icoOff offline" }
+            $ssid = '' ; $sig = ''
+            foreach ($line in ($info -split "`r?`n")) {
+                # "^\s*SSID" deliberately will not match "BSSID"; first wins.
+                if (-not $ssid -and $line -match '^\s*SSID\s*:\s*(.+?)\s*$')   { $ssid = $Matches[1] }
+                if (-not $sig  -and $line -match '^\s*Signal\s*:\s*(.+?)\s*$') { $sig  = $Matches[1] }
+            }
+            if ($ssid) { "$icoWifi $ssid $sig" } else { "$icoOff offline" }
+        }
+
+        $tick = 0
+        while ($true) {
+            try {
+                $v = Read-Volume  ; if ($v) { $hw['volume']  = $v }
+                $b = Read-Battery ; if ($b) { $hw['battery'] = $b }
+                # netsh costs ~110ms against ~10ms for the two helpers, and the
+                # SSID essentially never changes, so it runs every 15th pass.
+                if ($tick % 15 -eq 0) { $w = Read-Wifi ; if ($w) { $hw['wifi'] = $w } }
+            } catch {
+                "[$(Get-Date -Format o)] probe error: $_" | Out-File -FilePath $logPath -Append
+            }
+            $tick++
+            Start-Sleep -Milliseconds 1000
+        }
+    }
+
+    # The probes run off the UI thread. netsh alone blocks ~110ms, and stalling
+    # the 120ms tick would bring back exactly the lag that interval was chosen
+    # to kill (the pill lingering for a beat after you leave the browser).
+    $script:hwRunspace = [runspacefactory]::CreateRunspace()
+    $script:hwRunspace.ApartmentState = 'MTA'
+    $script:hwRunspace.ThreadOptions  = 'ReuseThread'
+    $script:hwRunspace.Open()
+    $script:hwRunspace.SessionStateProxy.SetVariable('hw', $script:hw)
+    $script:hwRunspace.SessionStateProxy.SetVariable('logPath', $logPath)
+    $script:hwPs = [powershell]::Create()
+    $script:hwPs.Runspace = $script:hwRunspace
+    [void]$script:hwPs.AddScript($probeScript)
+    [void]$script:hwPs.BeginInvoke()
+
+    function Update-Status {
+        # Same fields, order and separator as `status-right` in ~/.tmux.conf:
+        #   volume | battery | %a %d %b %H:%M | wifi
+        # A field is left out entirely until its first probe lands, rather than
+        # showing a blank slot, so the pill never renders a stray " | ".
+        $now  = [datetime]::Now
+        $when = $now.ToString("ddd dd MMM HH:mm", [System.Globalization.CultureInfo]::InvariantCulture)
+        $parts = @()
+        if ($script:hw['volume'])  { $parts += $script:hw['volume'] }
+        if ($script:hw['battery']) { $parts += $script:hw['battery'] }
+        $parts += $when
+        if ($script:hw['wifi'])    { $parts += $script:hw['wifi'] }
+        $text = $parts -join ' | '
+
+        # Everything past here resizes the window and re-samples the dot grid,
+        # so it is gated on the text actually changing. Building the string
+        # above is a handful of concats -- doing that 8x a second is free, and
+        # it replaces the old minute-rollover check, which would have missed
+        # volume and battery changes.
+        if ($script:barText -eq $text) { return }
+        $script:barText = $text
 
         $size = [System.Windows.Forms.TextRenderer]::MeasureText($text, $font)
         $w = $size.Width + (2 * $padX)
@@ -236,8 +349,9 @@ public class Win32 {
         if ($old) { $old.Dispose() }
         $path.Dispose()
 
-        # Rebuild the dot grid for the new time. Once a minute, so the cost of
-        # rendering and sampling the mask bitmap does not matter.
+        # Rebuild the dot grid for the new text. Sampling the mask bitmap costs
+        # ~23ms at this width, but it only runs when the string changed -- the
+        # minute rolling over, or a volume/battery/wifi value moving.
         $script:dotCols = [int](($w - 2 * $DotPad) / $DotPitch)
         $script:dotRows = [int](($h - 2 * $DotPad) / $DotPitch)
         $script:dotMap  = Build-DotMap -Text $text -Cols $script:dotCols -Rows $script:dotRows
@@ -294,7 +408,7 @@ public class Win32 {
     $timer.Interval = 120
     $timer.Add_Tick({
         try {
-            Update-Clock
+            Update-Status
             $fg = [Win32]::GetForegroundWindow()
             # Visible only when a browser is in front and not in video
             # fullscreen. Our own window as foreground is ignored -- reusing
@@ -335,7 +449,7 @@ public class Win32 {
         }
     })
 
-    Update-Clock
+    Update-Status
     $form.Show()
     [void][Win32]::SetWindowPos($form.Handle, $HWND_TOPMOST, 0, 0, 0, 0,
         ($SWP_NOMOVE -bor $SWP_NOSIZE -bor $SWP_NOACTIVATE))
@@ -343,6 +457,12 @@ public class Win32 {
 
     "[$(Get-Date -Format o)] entering message loop" | Out-File -FilePath $logPath -Append
     [System.Windows.Forms.Application]::Run()
+
+    # The probe loop never returns on its own, so stop it explicitly -- without
+    # this the process would linger after the window is gone.
+    if ($script:hwPs)       { $script:hwPs.Stop() ; $script:hwPs.Dispose() }
+    if ($script:hwRunspace) { $script:hwRunspace.Dispose() }
+
     "[$(Get-Date -Format o)] message loop exited normally" | Out-File -FilePath $logPath -Append
 } catch {
     "[$(Get-Date -Format o)] FATAL: $_" | Out-File -FilePath $logPath -Append
