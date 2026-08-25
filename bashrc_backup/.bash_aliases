@@ -114,3 +114,5 @@ claudex() {
   CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1 \
   claude "$@"
 }
+
+alias kill-exporer='/mnt/c/Windows/System32/taskkill.exe /F /IM explorer.exe 2>&1 < /dev/null'
