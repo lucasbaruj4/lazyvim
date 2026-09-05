@@ -106,7 +106,66 @@ obsidian() {
 }
 
 # --- CLIProxyAPI: Claude Code on ChatGPT/Codex subscription ---
+_claudex_update() {
+  local repo="router-for-me/CLIProxyAPI"
+  local binary="$HOME/cliproxyapi/cli-proxy-api"
+  local arch latest current tmp archive
+
+  case "$(uname -m)" in
+    x86_64) arch="amd64" ;;
+    aarch64|arm64) arch="aarch64" ;;
+    *) echo "unsupported architecture: $(uname -m)"; return 1 ;;
+  esac
+
+  command -v gh >/dev/null || { echo "gh is required"; return 1; }
+  [ -x "$binary" ] || { echo "CLIProxyAPI not found: $binary"; return 1; }
+
+  latest="$(gh release view --repo "$repo" --json tagName --jq '.tagName')" || return 1
+  current="$("$binary" -h 2>&1)"
+  current="${current%%$'\n'*}"
+
+  if [[ "$current" == *"${latest#v}"* ]]; then
+    echo "CLIProxyAPI is already up to date ($latest)"
+    return 0
+  fi
+
+  tmp="$(mktemp -d)" || return 1
+  archive="$tmp/CLIProxyAPI_${latest#v}_linux_${arch}.tar.gz"
+  echo "Updating CLIProxyAPI to $latest..."
+
+  if ! gh release download "$latest" --repo "$repo" \
+      --pattern "$(basename "$archive")" --dir "$tmp" ||
+      ! tar -xzf "$archive" -C "$tmp" ||
+      ! "$tmp/cli-proxy-api" -h >/dev/null 2>&1; then
+    rm -rf -- "$tmp"
+    echo "update download or validation failed"
+    return 1
+  fi
+
+  cp -p "$binary" "$binary.previous" || { rm -rf -- "$tmp"; return 1; }
+  install -m 755 "$tmp/cli-proxy-api" "$binary.new" || { rm -rf -- "$tmp"; return 1; }
+  mv "$binary.new" "$binary"
+
+  if ! systemctl --user restart cliproxyapi.service; then
+    mv "$binary.previous" "$binary"
+    systemctl --user restart cliproxyapi.service
+    rm -rf -- "$tmp"
+    echo "update failed; restored previous version"
+    return 1
+  fi
+
+  rm -f "$binary.previous"
+  rm -rf -- "$tmp"
+  "$binary" -h 2>&1 | { IFS= read -r line; echo "$line"; }
+}
+
 claudex() {
+  if [ "${1-}" = "update" ]; then
+    [ "$#" -eq 1 ] || { echo "usage: claudex update"; return 2; }
+    _claudex_update
+    return
+  fi
+
   local key
   key="$(cat ~/.cli-proxy-api/.claudex-key 2>/dev/null)" || { echo "no claudex key"; return 1; }
   ANTHROPIC_BASE_URL=http://127.0.0.1:8317 \
