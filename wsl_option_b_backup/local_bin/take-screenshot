@@ -17,9 +17,22 @@ mkdir -p "$TARGET_DIR"
 echo "📸 Capturing screenshot..."
 
 # PowerShell does the actual capture (full primary screen)
-raw_result=$("$PS" -NoProfile -Command '
+# Passed as -EncodedCommand rather than -Command: the C# below contains double
+# quotes, and those get mangled going bash -> WSL interop -> PowerShell's own
+# argv parsing. Base64 sidesteps the quoting entirely.
+ps_script=$(cat <<'PSEOF'
+$ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms
+# Without this the process is DPI-unaware, so Windows reports the virtualised
+# desktop size (1280x800 at 150% scale) instead of the real 1920x1200 and the
+# capture comes out downscaled. Must run before any screen bounds are read.
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class Dpi { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); }
+"@
+[void][Dpi]::SetProcessDPIAware()
 $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
 $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
@@ -30,7 +43,11 @@ $bitmap.Save($winpath, [System.Drawing.Imaging.ImageFormat]::Png)
 $bitmap.Dispose()
 $graphics.Dispose()
 Write-Output "IMAGE_SAVED:$winpath"
-' 2>/dev/null || echo "CAPTURE_FAILED")
+PSEOF
+)
+encoded=$(printf '%s' "$ps_script" | iconv -f UTF-8 -t UTF-16LE | base64 -w0)
+
+raw_result=$("$PS" -NoProfile -EncodedCommand "$encoded" 2>/dev/null < /dev/null || echo "CAPTURE_FAILED")
 
 result=$(echo "$raw_result" | tr -d '\r')
 

@@ -50,6 +50,7 @@ public class Win32 {
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr hWnd, out int pid);
+    [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
     public static string TitleOf(IntPtr h) {
         int len = GetWindowTextLength(h);
@@ -60,6 +61,12 @@ public class Win32 {
     }
 }
 "@
+
+    # Without this the process is DPI-unaware: it draws into a 1280x800 logical
+    # surface that Windows then stretches to the real 1920x1200, which softens
+    # every glyph edge. Aware, it draws at true pixels. Must run before any
+    # window is created or any screen bound is read.
+    [void][Win32]::SetProcessDPIAware()
 
     $GWL_STYLE       = -16
     $GWL_EXSTYLE     = -20
@@ -93,17 +100,23 @@ public class Win32 {
     # or they come out as empty boxes. "NFM" is the mono variant -- this is
     # columnar status text, same as the bar it copies.
     $fontName = "CaskaydiaMono NFM"
+    # Point sizes already track the display scale, so this one is left alone:
+    # measured at 150%, 15pt renders 753px wide against 502px at 100%. Scaling
+    # it here as well would double-apply the factor.
     $fontSize = 15
-    $margin   = 20       # gap from the bottom-right screen corner
-    $padX     = 14
-    $padY     = 7
+    # Everything below is raw pixels, which do NOT track the display scale, so
+    # the 150% factor is baked in to keep the pill its usual physical size.
+    # Original 100% values are in the comments; redo these if the scale changes.
+    $margin   = 30       # gap from the bottom-right screen corner (was 20)
+    $padX     = 21       # was 14
+    $padY     = 11       # was 7
 
     # Grid geometry, same values the pet uses.
-    $DotPitch  = 2.0
-    $DotRadius = 0.8
+    $DotPitch  = 3.0     # was 2.0
+    $DotRadius = 1.2     # was 0.8
     $DotPad    = 0      # no inset: the grid runs edge to edge
     $GridAlpha = 26      # unlit cells, so the grid itself reads as a display
-    $Radius    = 12      # rounded-rect corners, same as the pet
+    $Radius    = 18      # rounded-rect corners, same as the pet (was 12)
 
     $font = New-Object System.Drawing.Font($fontName, $fontSize, [System.Drawing.FontStyle]::Regular)
     if ($font.Name -ne $fontName) {
