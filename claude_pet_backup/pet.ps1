@@ -29,9 +29,16 @@ public class PetNative {
   [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int i);
   [DllImport("user32.dll")] public static extern int SetWindowLong(IntPtr h, int i, int v);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
 }
 "@
+
+# Without this the process is DPI-unaware: it draws into a 1280x800 logical
+# surface that Windows then stretches to the real 1920x1200, which smears every
+# dot. Aware, the dots land on true pixels. Must run before any window is
+# created or any screen bound is read.
+[void][PetNative]::SetProcessDPIAware()
 
 # ---------------------------------------------------------------- config ----
 $Root      = Join-Path $env:USERPROFILE ".claudepet"
@@ -45,15 +52,19 @@ $TermProcs = @("alacritty", "WindowsTerminal", "wezterm-gui", "wt")
 
 # Size of the badge. Same for every state -- colour and word carry the meaning,
 # not size. Tweak these two numbers to match the clock widget.
-$W = 150
-$H = 44
+#
+# These are raw pixels, which do not track the display scale, so the 150%
+# factor is baked in to keep the badge its usual physical size. Originals at
+# 100% are in the comments; redo them if the display scale changes.
+$W = 225   # was 150
+$H = 66    # was 44
 
 # Dot-matrix look, after the Nothing phone glyph display: the label is rendered
 # into a tiny offscreen bitmap, then each lit pixel is drawn as a circle.
 # $DotPitch is the grid spacing in px; smaller = finer matrix, more legible
 # text, less chunky. $DotRadius is the size of each lit dot.
-$DotPitch  = 2.0
-$DotRadius = 0.8
+$DotPitch  = 3.0   # was 2.0
+$DotRadius = 1.2   # was 0.8
 $Pad       = 0
 # Unlit cells, drawn faintly so the grid itself reads as a display. Ignored
 # when $Transparent is on -- an unlit grid floating over video just reads as
@@ -167,7 +178,7 @@ function Test-ShouldHide {
 
 # ------------------------------------------------------------------ form ----
 $scr = [Windows.Forms.Screen]::PrimaryScreen.Bounds
-$defaultPos = New-Object Drawing.Point(($scr.Left + 28), ($scr.Bottom - 28 - $H))
+$defaultPos = New-Object Drawing.Point(($scr.Left + 42), ($scr.Bottom - 42 - $H))   # 28 at 100%
 $pos = $defaultPos
 if (Test-Path $PosFile) {
   $pp = (Get-Content $PosFile -First 1) -split ','
@@ -203,7 +214,7 @@ $form.GetType().GetProperty("DoubleBuffered",
   [Reflection.BindingFlags]"Instance,NonPublic").SetValue($form, $true, $null)
 
 # Rounded rectangle, computed once -- the size never changes.
-$rad = 12
+$rad = 18   # was 12
 $gp = New-Object Drawing.Drawing2D.GraphicsPath
 $gp.AddArc(0, 0, $rad, $rad, 180, 90)
 $gp.AddArc($W - $rad, 0, $rad, $rad, 270, 90)
