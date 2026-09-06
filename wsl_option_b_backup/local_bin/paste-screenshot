@@ -63,9 +63,33 @@ if echo "$result" | grep -q "IMAGE_SAVED:"; then
 
   if cp "$wslpath" "$target" 2>/dev/null; then
     echo "✅ Screenshot saved to: $target"
-    # Put the usable path into the Windows clipboard too
-    echo -n "$target" | /mnt/c/Windows/System32/clip.exe 2>/dev/null || true
-    echo "   (local path also copied to clipboard)"
+
+    # Publish image, file, and text together so the receiving app chooses.
+    if SCREENSHOT_WIN_PATH="$winpath" SCREENSHOT_WSL_PATH="$target" \
+      WSLENV="${WSLENV:+$WSLENV:}SCREENSHOT_WIN_PATH:SCREENSHOT_WSL_PATH" \
+      "$PS" -NoProfile -STA -Command '
+      Add-Type -AssemblyName System.Windows.Forms
+      Add-Type -AssemblyName System.Drawing
+
+      $img = [System.Drawing.Image]::FromFile($env:SCREENSHOT_WIN_PATH)
+      try {
+        $data = New-Object System.Windows.Forms.DataObject
+        $data.SetImage($img)
+        $data.SetText($env:SCREENSHOT_WSL_PATH, [System.Windows.Forms.TextDataFormat]::UnicodeText)
+
+        $files = New-Object System.Collections.Specialized.StringCollection
+        [void]$files.Add($env:SCREENSHOT_WIN_PATH)
+        $data.SetFileDropList($files)
+
+        [System.Windows.Forms.Clipboard]::SetDataObject($data, $true)
+      } finally {
+        $img.Dispose()
+      }
+      ' </dev/null 2>/dev/null; then
+      echo "   Clipboard contains the image, PNG file, and WSL path."
+    else
+      echo "⚠️  Screenshot saved, but the clipboard could not be updated."
+    fi
     echo ""
     echo "   Examples:"
     echo "     file \"$target\""
