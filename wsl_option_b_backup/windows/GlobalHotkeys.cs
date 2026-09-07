@@ -12,10 +12,9 @@ using System.Windows.Forms;
 //   Ctrl+Alt+Up/Down    -> volume up/down
 //   Ctrl+Shift+M        -> mute toggle
 //   Alt+1 / Alt+2       -> focus Alacritty / Brave
-// It also installs a low-level keyboard hook that swallows Alt+Tab, so app
-// switching only ever happens through Alt+1 / Alt+2. Alt+Tab's switcher UI is
-// part of explorer.exe, which this machine doesn't run, so leaving it enabled
-// produces half-drawn/ghost windows.
+// It also installs a low-level keyboard hook that swallows Alt+Tab and
+// Alt+Space. App switching only ever happens through Alt+1 / Alt+2; both
+// Windows UIs belong to explorer.exe, which this machine doesn't run.
 class HotkeyListener : Form {
     [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -48,6 +47,7 @@ class HotkeyListener : Form {
     const int WM_SYSKEYUP = 0x0105;
     const uint LLKHF_ALTDOWN = 0x20;
     const uint VK_TAB = 0x09;
+    const uint VK_SPACE = 0x20;
 
     const uint MOD_ALT = 0x0001;
     const uint MOD_CONTROL = 0x0002;
@@ -98,19 +98,19 @@ class HotkeyListener : Form {
         RegisterHotKey(this.Handle, ID_FOCUS_TERM, MOD_ALT, VK_1);
         RegisterHotKey(this.Handle, ID_FOCUS_BRAVE, MOD_ALT, VK_2);
 
-        hookProc = AltTabBlocker;
+        hookProc = SystemShortcutBlocker;
         hookHandle = SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, GetModuleHandle(null), 0);
     }
 
-    // Swallows Tab (and Shift+Tab) while Alt is held, in both directions, so
-    // no app ever sees an Alt+Tab keystroke.
-    static IntPtr AltTabBlocker(int nCode, IntPtr wParam, IntPtr lParam) {
+    // Swallows Tab and Space while Alt is held, in both directions, so neither
+    // the Alt+Tab switcher nor the Alt+Space window menu can appear.
+    static IntPtr SystemShortcutBlocker(int nCode, IntPtr wParam, IntPtr lParam) {
         if (nCode >= 0) {
             int msg = wParam.ToInt32();
             if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN || msg == WM_KEYUP || msg == WM_SYSKEYUP) {
                 uint vk = (uint)Marshal.ReadInt32(lParam, 0);
                 uint flags = (uint)Marshal.ReadInt32(lParam, 8);
-                if (vk == VK_TAB && (flags & LLKHF_ALTDOWN) != 0) {
+                if ((vk == VK_TAB || vk == VK_SPACE) && (flags & LLKHF_ALTDOWN) != 0) {
                     return (IntPtr)1;
                 }
             }

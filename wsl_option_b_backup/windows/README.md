@@ -12,7 +12,7 @@ by hand.
 | --- | --- |
 | `alacritty-shell.vbs` | The login shell itself. Starts the helpers below, then runs Alacritty in the foreground and blocks. Closing Alacritty logs you out. |
 | `alacritty.toml` | Alacritty config; spawns `wsl.exe -d Ubuntu`. |
-| `GlobalHotkeys.cs` | System-wide hotkeys: Shift+S screenshot, Ctrl+Alt+Up/Down volume, Ctrl+Shift+M mute, Alt+1 Alacritty, Alt+2 Brave. Also blocks Alt+Tab. |
+| `GlobalHotkeys.cs` | System-wide hotkeys: Shift+S screenshot, Ctrl+Alt+Up/Down volume, Ctrl+Shift+M mute, Alt+1 Alacritty, Alt+2 Brave. Also blocks Alt+Tab and Alt+Space. |
 | `AudioCtl.cs` | COM audio-endpoint helper the volume hotkeys call. |
 | `wallpaper-window.ps1` | Borderless fullscreen wallpaper, since no explorer means no desktop. Pins itself to the bottom of the z-order. |
 | `clock-overlay.ps1` | Always-on-top corner clock, hides over fullscreen windows. |
