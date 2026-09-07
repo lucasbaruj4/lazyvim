@@ -8,6 +8,9 @@ error_symbol = "[>](bold #ff3b3b)"
 [status]
 disabled = true
 
+[gcloud]
+disabled = true
+
 [rust]
 disabled = true
 
