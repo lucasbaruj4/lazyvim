@@ -243,5 +243,6 @@ claude() {
 # is no explorer.exe and hence no Startup folder or Run key -- starting it from
 # the shell is the equivalent of "on logon". `ensure` is a single stat when the
 # pet is already up, so panes after the first cost nothing.
-[[ $- == *i* ]] && [ -x "$HOME/.claude/pet/pet.sh" ] && \
-  ( "$HOME/.claude/pet/pet.sh" ensure >/dev/null 2>&1 & )
+# Disabled at Lucas's request: do not auto-start the Claude pet.
+# [[ $- == *i* ]] && [ -x "$HOME/.claude/pet/pet.sh" ] && \
+#   ( "$HOME/.claude/pet/pet.sh" ensure >/dev/null 2>&1 & )

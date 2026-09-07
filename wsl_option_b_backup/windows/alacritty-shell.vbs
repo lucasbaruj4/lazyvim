@@ -20,7 +20,8 @@ WshShell.Run "powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolic
 ' It hides itself whenever the foreground window is truly fullscreen --
 ' YouTube video fullscreen, and Alacritty (which starts fullscreen and
 ' already shows the same clock in its status bar).
-WshShell.Run "powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File ""C:\Users\Admin\AppData\Local\clock-overlay.ps1""", 0, False
+' Disabled at Lucas's request: do not auto-start the clock overlay.
+' WshShell.Run "powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File ""C:\Users\Admin\AppData\Local\clock-overlay.ps1""", 0, False
 
 ' Background helper: system-wide hotkey listener (GlobalHotkeys.exe) --
 ' screenshot (Shift+S), volume up/down (Ctrl+Alt+Up/Down), mute toggle
