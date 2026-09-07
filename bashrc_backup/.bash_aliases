@@ -175,3 +175,17 @@ claudex() {
 }
 
 alias kill-exporer='/mnt/c/Windows/System32/taskkill.exe /F /IM explorer.exe 2>&1 < /dev/null'
+
+# Mirror of the /clock-on skill: clean restart of the Nothing-style pill,
+# then bounce its z-order so it lands above Brave instead of behind it.
+clock-on() {
+  # Match on `-File ...clock-overlay.ps1` so the query's own PowerShell
+  # (whose CommandLine also contains the string "clock-overlay.ps1") is not
+  # picked up and killed mid-loop.
+  local ps='/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'
+  "$ps" -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { \$_.CommandLine -match '-File.*clock-overlay\.ps1' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force; \"killed \$(\$_.ProcessId)\" }" 2>&1 < /dev/null
+  sleep 0.6
+  "$ps" -NoProfile -Command "Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine='wscript.exe \"C:\\Users\\Admin\\AppData\\Local\\clock-overlay-launch.vbs\"'} | Select-Object ReturnValue,ProcessId | Format-List" 2>&1 < /dev/null
+  sleep 1.5
+  "$ps" -NoProfile -Command "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Z { [DllImport(\"user32.dll\", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string c, string n); [DllImport(\"user32.dll\")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int w, int t, uint f); }'; \$h=[Z]::FindWindow(\$null,'clock-overlay-nothing-pill'); if (\$h -eq [IntPtr]::Zero) { 'pill hwnd not found yet (focus Brave to trigger the show flip)' } else { [void][Z]::SetWindowPos(\$h,[IntPtr]::new(-2),0,0,0,0,0x0013); [void][Z]::SetWindowPos(\$h,[IntPtr]::new(-1),0,0,0,0,0x0013); \"bounced hwnd \$h\" }" 2>&1 < /dev/null
+}
