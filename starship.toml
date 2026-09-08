@@ -1,9 +1,20 @@
-# Simplified Starship (no emojis)
+# Simplified Starship (Grok Night palette, no emojis)
+palette = "grok-night"
+
+[palettes.grok-night]
+blue = "#7aa2f7"
+blue_light = "#9abdf5"
+cyan = "#7dcfff"
+green = "#9ece6a"
+red = "#f7768e"
+purple = "#bb9af7"
+yellow = "#e0af68"
+text = "#e1e1e1"
+muted = "#6c6c6c"
 
 [character]
-success_symbol = "[>](bold #00ff66)"
-error_symbol = "[>](bold #ff3b3b)"
-
+success_symbol = "[>](bold blue_light)"
+error_symbol = "[>](bold red)"
 
 [status]
 disabled = true
@@ -16,8 +27,13 @@ disabled = true
 
 [directory]
 fish_style_pwd_dir_length = 0
-format = "[$path](bold #00ff66) "
+format = "[$path](bold blue_light) "
 
+[git_branch]
+style = "bold purple"
+
+[git_status]
+style = "yellow"
 
 [cmd_duration]
 disabled = true
@@ -36,5 +52,3 @@ disabled = true
 
 [lua]
 disabled = true
-
-
