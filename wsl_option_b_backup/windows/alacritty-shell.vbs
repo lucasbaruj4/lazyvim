@@ -11,9 +11,6 @@ Set WshShell = CreateObject("WScript.Shell")
 ' Background helper: screenshot clipboard watcher (fire-and-forget)
 WshShell.Run "powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File ""C:\Users\Admin\AppData\Local\clipboard-watcher.ps1""", 0, False
 
-' Background helper: wallpaper window, so Alacritty's opacity has something
-' to show through. Launched before Alacritty so it's already on screen.
-WshShell.Run "powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File ""C:\Users\Admin\AppData\Local\wallpaper-window.ps1""", 0, False
 
 ' Background helper: always-on-top clock overlay in the top-right corner, so
 ' the time is readable from the browser without switching to the tmux bar.

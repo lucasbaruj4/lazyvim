@@ -17,13 +17,13 @@ size = 18.0  # Slightly larger on Windows for readability
 [window]
 padding = { x = 14, y = 1 }
 decorations = "Full"  # Changed: "None" hides titlebar on Windows (not recommended)
-opacity = 0.65
+opacity = 1.0
 dynamic_padding = false
 startup_mode = "Fullscreen"
 
 # === Colors: Hacker Green + Dark Steel ===
 [colors.primary]
-background = "#0a0a0a"
+background = "#191824"
 foreground = "#ffffff"
 
 [colors.normal]
@@ -62,7 +62,7 @@ action = "ToggleFullscreen"
 [[keyboard.bindings]]
 key = "V"
 mods = "Control|Shift"
-action = "Paste"
+chars = "\u001b[118;6u" # Send Ctrl+Shift+V to Pi's clipboard-image handler
 
 [[keyboard.bindings]]
 key = "C"
