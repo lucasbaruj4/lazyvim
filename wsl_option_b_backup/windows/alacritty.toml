@@ -21,38 +21,38 @@ opacity = 1.0
 dynamic_padding = false
 startup_mode = "Fullscreen"
 
-# === Colors: Hacker Green + Dark Steel ===
+# === Colors: Grok Night ===
 [colors.primary]
 background = "#191824"
-foreground = "#ffffff"
+foreground = "#e1e1e1"
 
 [colors.normal]
-black   = "#111111"
-red     = "#ff3b3b"
-green   = "#00ff66"
-yellow  = "#dfff00"
-blue    = "#26a8ff"
-magenta = "#ff4dff"
-cyan    = "#00ffd5"
-white   = "#cccccc"
+black   = "#0a0a0a"
+red     = "#f7768e"
+green   = "#9ece6a"
+yellow  = "#e0af68"
+blue    = "#7aa2f7"
+magenta = "#bb9af7"
+cyan    = "#7dcfff"
+white   = "#c8c8c8"
 
 [colors.bright]
-black   = "#2a2a2a"
-red     = "#ff5454"
-green   = "#00ff7f"
-yellow  = "#f2ff5e"
-blue    = "#4db8ff"
-magenta = "#ff66ff"
-cyan    = "#33ffe6"
-white   = "#f0f0f0"
+black   = "#414141"
+red     = "#ff5370"
+green   = "#73daca"
+yellow  = "#ffdb69"
+blue    = "#9abdf5"
+magenta = "#c0caf5"
+cyan    = "#b4f9f8"
+white   = "#e1e1e1"
 
 [colors.cursor]
-text = "#0a0a0a"
+text = "#191824"
 cursor = "#7aa2f7"
 
 [colors.selection]
-text = "#0a0a0a"
-background = "#00ff66"
+text = "#191824"
+background = "#7aa2f7"
 
 # === Keybindings ===
 [[keyboard.bindings]]
